@@ -710,7 +710,7 @@ export default function Inward() {
             <h2 className="text-xl font-semibold text-foreground">Inward Transporter Records</h2>
             <p className="text-sm text-muted-foreground">Manage transporter invoices and payments</p>
           </div>
-          {user?.role !== 'admin' && (
+          {['admin', 'superadmin'].includes(user?.role || '') && (
             <Button onClick={() => setIsMaterialModalOpen(true)}>
               <Plus className="w-4 h-4 mr-2" /> Add Material Record
             </Button>
@@ -728,12 +728,13 @@ export default function Inward() {
             { key: "wasteName", header: "Waste Name", render: (m: InwardMaterial) => m.wasteName || '-' },
             { key: "category", header: "Category", render: (m: InwardMaterial) => m.category || '-' },
             { key: "quantity", header: "Quantity", render: (m: InwardMaterial) => m.quantity ? `${m.quantity} ${m.unit || ''}` : '-' },
+            { key: "vehicleCapacity", header: "Vehicle Capacity", render: (m: InwardMaterial) => m.vehicleCapacity || '-' },
             ...(user?.role === 'admin' || user?.role === 'superadmin' ? [
-              { key: "rate", header: "Rate", render: (m: InwardMaterial) => m.rate ? `₹${Number(m.rate).toFixed(2)}` : '-' },
-              { key: "amount", header: "Amount", render: (m: InwardMaterial) => m.amount ? `₹${Number(m.amount).toFixed(2)}` : '-' },
-              { key: "detCharges", header: "Det. Charges", render: (m: InwardMaterial) => m.detCharges ? `₹${Number(m.detCharges).toFixed(2)}` : '-' },
-              { key: "gst", header: "GST", render: (m: InwardMaterial) => m.gst ? `₹${Number(m.gst).toFixed(2)}` : '-' },
-              { key: "grossAmount", header: "Gross Amount", render: (m: InwardMaterial) => m.grossAmount ? `₹${Number(m.grossAmount).toFixed(2)}` : '-' },
+              { key: "rate", header: "Rate", render: (m: InwardMaterial) => (m.rate !== null && m.rate !== undefined) ? `₹${Number(m.rate).toFixed(2)}` : '-' },
+              { key: "amount", header: "Amount", render: (m: InwardMaterial) => (m.amount !== null && m.amount !== undefined) ? `₹${Number(m.amount).toFixed(2)}` : '-' },
+              { key: "detCharges", header: "Det. Charges", render: (m: InwardMaterial) => (m.detCharges !== null && m.detCharges !== undefined) ? `₹${Number(m.detCharges).toFixed(2)}` : '-' },
+              { key: "gst", header: "GST", render: (m: InwardMaterial) => (m.gst !== null && m.gst !== undefined) ? `₹${Number(m.gst).toFixed(2)}` : '-' },
+              { key: "grossAmount", header: "Gross Amount", render: (m: InwardMaterial) => (m.grossAmount !== null && m.grossAmount !== undefined) ? `₹${Number(m.grossAmount).toFixed(2)}` : '-' },
               { key: "invoiceNo", header: "Invoice No.", render: (m: InwardMaterial) => m.invoiceNo || '-' },
               { key: "paidOn", header: "Paid On", render: (m: InwardMaterial) => m.paidOn ? format(new Date(m.paidOn), 'dd MMM yyyy') : '-' },
             ] : []),
@@ -742,7 +743,7 @@ export default function Inward() {
               header: "Actions",
               render: (m: InwardMaterial) => (
                 <div className="flex items-center gap-2">
-                  {user?.role !== 'admin' && (
+                  {['admin', 'superadmin'].includes(user?.role || '') && (
                     <>
                       <button
                         onClick={() => {

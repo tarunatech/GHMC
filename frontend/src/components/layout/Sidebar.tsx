@@ -15,6 +15,7 @@ import {
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/contexts/AuthContext";
+import logo from "@/assets/logo.png";
 
 const menuItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/", roles: ['admin', 'superadmin'] },
@@ -50,13 +51,13 @@ export function Sidebar({ className, onItemClick }: SidebarProps) {
     >
       {/* Logo */}
       <div className="p-6 border-b border-sidebar-border flex items-center gap-3">
-        <div className="w-10 h-10 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
-          <Beaker className="w-6 h-6 text-primary" />
+        <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0 p-1 shadow-sm">
+          <img src={logo} alt="GHMC" className="w-full h-full object-contain" />
         </div>
         {!collapsed && (
           <div className="slide-in">
-            <h1 className="font-bold text-foreground text-lg">ChemWaste</h1>
-            <p className="text-xs text-muted-foreground">ERP System</p>
+            <h1 className="font-bold text-foreground text-lg uppercase tracking-wider">GHMC</h1>
+            <p className="text-[10px] text-muted-foreground uppercase">Gujarat Hazard Waste</p>
           </div>
         )}
       </div>

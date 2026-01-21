@@ -1,6 +1,7 @@
 import invoicesService from '../services/invoices.service.js';
 import { ValidationError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
+import { uploadFile } from '../utils/storage.js';
 
 /**
  * Invoices Controller
@@ -174,6 +175,40 @@ class InvoicesController {
       });
     } catch (error) {
       logger.error('Error fetching invoice stats:', error);
+      next(error);
+    }
+  }
+
+  /**
+   * Upload invoice PDF to storage
+   * POST /api/invoices/:id/upload
+   */
+  async uploadInvoice(req, res, next) {
+    try {
+      const { id } = req.params;
+      const file = req.file;
+
+      if (!file) {
+        throw new ValidationError('No file uploaded');
+      }
+
+      const invoice = await invoicesService.getInvoiceById(id);
+      const fileName = `invoices/${invoice.invoiceNo}_${Date.now()}.pdf`;
+
+      const fileUrl = await uploadFile(file.buffer, fileName, file.mimetype);
+
+      // Optionally update the invoice in DB with the URL if you add the field later
+      // For now, we just return the URL
+      res.json({
+        success: true,
+        message: 'Invoice uploaded successfully',
+        data: {
+          url: fileUrl,
+          fileName: fileName
+        },
+      });
+    } catch (error) {
+      logger.error('Error uploading invoice:', error);
       next(error);
     }
   }

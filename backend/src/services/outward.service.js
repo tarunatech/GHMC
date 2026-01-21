@@ -463,10 +463,14 @@ class OutwardService {
     const totalDispatches = entries.length;
     const totalQuantity = entries.reduce((sum, e) => sum + Number(e.quantity), 0);
 
-    // Calculate invoiced and received from linked invoices
-    const totalInvoiced = entries
-      .filter((e) => e.invoice)
-      .reduce((sum, e) => sum + Number(e.invoice.grandTotal), 0);
+    // Calculate invoiced and received
+    // Prioritize entry.grossAmount if available (reflects latest edits), otherwise fallback to invoice.grandTotal
+    const totalInvoiced = entries.reduce((sum, e) => {
+      // If entry has a specific gross amount (from manual edit/calc), use it.
+      // Otherwise if it has a linked invoice, use that invoice's total.
+      const amount = e.grossAmount ? Number(e.grossAmount) : (e.invoice ? Number(e.invoice.grandTotal) : 0);
+      return sum + amount;
+    }, 0);
 
     const totalReceived = entries
       .filter((e) => e.invoice)

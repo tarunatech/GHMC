@@ -298,7 +298,7 @@ export default function Outward() {
       { key: "rate", header: "Rate", render: (e: OutwardEntry) => e.rate ? `₹${Number(e.rate).toFixed(2)}` : '-' },
       { key: "amount", header: "Amount", render: (e: OutwardEntry) => e.amount ? `₹${Number(e.amount).toFixed(2)}` : '-' },
       { key: "gst", header: "GST", render: (e: OutwardEntry) => e.gst ? `₹${Number(e.gst).toFixed(2)}` : '-' },
-      { key: "grossAmount", header: "Gross Amount", render: (e: OutwardEntry) => e.invoice?.grandTotal ? `₹${Number(e.invoice.grandTotal).toLocaleString()}` : e.grossAmount ? `₹${Number(e.grossAmount).toLocaleString()}` : "-" },
+      { key: "grossAmount", header: "Gross Amount", render: (e: OutwardEntry) => e.grossAmount ? `₹${Number(e.grossAmount).toLocaleString()}` : (e.invoice?.grandTotal ? `₹${Number(e.invoice.grandTotal).toLocaleString()}` : "-") },
     ] : []),
     { key: "packing", header: "Packing", render: (e: OutwardEntry) => e.packing || '-' },
     ...(['admin', 'superadmin'].includes(user?.role || '') ? [
@@ -629,7 +629,7 @@ export default function Outward() {
             <h2 className="text-xl font-semibold text-foreground">Outward Transporter Records</h2>
             <p className="text-sm text-muted-foreground">Manage transporter invoices and payments for outward/dispatch</p>
           </div>
-          {user?.role !== 'admin' && (
+          {['admin', 'superadmin'].includes(user?.role || '') && (
             <Button onClick={() => {
               setEditingMaterial(null);
               setIsMaterialModalOpen(true);
@@ -648,12 +648,13 @@ export default function Outward() {
             { key: "vehicleNo", header: "Vehicle No.", render: (m: OutwardMaterial) => m.vehicleNo || '-' },
             { key: "wasteName", header: "Waste Name", render: (m: OutwardMaterial) => m.wasteName || '-' },
             { key: "quantity", header: "Quantity", render: (m: OutwardMaterial) => m.quantity ? `${m.quantity} ${m.unit || ''}` : '-' },
+            { key: "vehicleCapacity", header: "Vehicle Capacity", render: (m: OutwardMaterial) => m.vehicleCapacity || '-' },
             ...(user?.role === 'admin' || user?.role === 'superadmin' ? [
-              { key: "rate", header: "Rate", render: (m: OutwardMaterial) => m.rate ? `₹${Number(m.rate).toFixed(2)}` : '-' },
-              { key: "amount", header: "Amount", render: (m: OutwardMaterial) => m.amount ? `₹${Number(m.amount).toFixed(2)}` : '-' },
-              { key: "detCharges", header: "Det. Charges", render: (m: OutwardMaterial) => m.detCharges ? `₹${Number(m.detCharges).toFixed(2)}` : '-' },
-              { key: "gst", header: "GST", render: (m: OutwardMaterial) => m.gst ? `₹${Number(m.gst).toFixed(2)}` : '-' },
-              { key: "grossAmount", header: "Gross Amount", render: (m: OutwardMaterial) => m.grossAmount ? `₹${Number(m.grossAmount).toFixed(2)}` : '-' },
+              { key: "rate", header: "Rate", render: (m: OutwardMaterial) => (m.rate !== null && m.rate !== undefined) ? `₹${Number(m.rate).toFixed(2)}` : '-' },
+              { key: "amount", header: "Amount", render: (m: OutwardMaterial) => (m.amount !== null && m.amount !== undefined) ? `₹${Number(m.amount).toFixed(2)}` : '-' },
+              { key: "detCharges", header: "Det. Charges", render: (m: OutwardMaterial) => (m.detCharges !== null && m.detCharges !== undefined) ? `₹${Number(m.detCharges).toFixed(2)}` : '-' },
+              { key: "gst", header: "GST", render: (m: OutwardMaterial) => (m.gst !== null && m.gst !== undefined) ? `₹${Number(m.gst).toFixed(2)}` : '-' },
+              { key: "grossAmount", header: "Gross Amount", render: (m: OutwardMaterial) => (m.grossAmount !== null && m.grossAmount !== undefined) ? `₹${Number(m.grossAmount).toFixed(2)}` : '-' },
               { key: "invoiceNo", header: "Invoice No.", render: (m: OutwardMaterial) => m.invoiceNo || '-' },
               { key: "paidOn", header: "Paid On", render: (m: OutwardMaterial) => m.paidOn ? format(new Date(m.paidOn), 'dd MMM yyyy') : '-' },
             ] : []),
@@ -662,7 +663,7 @@ export default function Outward() {
               header: "Actions",
               render: (m: OutwardMaterial) => (
                 <div className="flex items-center gap-2">
-                  {user?.role !== 'admin' && (
+                  {['admin', 'superadmin'].includes(user?.role || '') && (
                     <>
                       <button
                         onClick={() => {
@@ -806,22 +807,38 @@ function OutwardEntryForm({ transporters, entry, onCancel, onSubmit, isLoading }
     invoiceNo: entry?.invoice?.invoiceNo || "",
   });
 
+  // Auto-calculate Amount = Quantity * Rate
   useEffect(() => {
-    const qty = parseFloat(String(formData.quantity || '')) || 0;
-    const rate = parseFloat(String(formData.rate || '')) || 0;
-    const computedAmount = qty > 0 && rate > 0 ? qty * rate : undefined;
-    if ((computedAmount ?? '') !== (formData.amount || '')) {
-      setFormData((prev) => ({ ...prev, amount: computedAmount !== undefined ? String(Number(computedAmount.toFixed(2))) : prev.amount }));
+    const qty = parseFloat(String(formData.quantity || '0'));
+    const rate = parseFloat(String(formData.rate || '0'));
+
+    // Only auto-calculate if both are valid numbers. 
+    // If one is missing, we don't necessarily clear amount because user might have manual amount?
+    // But usually for consistent UI, we update it.
+    const computedAmount = Number((qty * rate).toFixed(2));
+
+    // Check if we should update. Compare numbers to avoid string format issues.
+    const currentAmount = parseFloat(String(formData.amount || '0'));
+
+    // Update if different AND (qty/rate changed OR amount is 0/empty) - to allow manual override?
+    // Actually simpler: just update it. If user wants manual amount, they shouldn't supply Rate?
+    // Or normally, Amount IS derived.
+    if (Math.abs(computedAmount - currentAmount) > 0.01) {
+      setFormData(prev => ({ ...prev, amount: String(computedAmount) }));
     }
   }, [formData.quantity, formData.rate]);
 
+  // Auto-calculate Gross Amount = Amount + GST + DetCharges
   useEffect(() => {
-    const amount = parseFloat(String(formData.amount || '')) || 0;
-    const det = parseFloat(String(formData.detCharges || '')) || 0;
-    const gst = parseFloat(String(formData.gst || '')) || 0;
-    const gross = amount + det + gst;
-    if (String(formData.grossAmount || '') !== String(gross)) {
-      setFormData((prev) => ({ ...prev, grossAmount: String(Number(gross.toFixed(2))) }));
+    const amount = parseFloat(String(formData.amount || '0'));
+    const det = parseFloat(String(formData.detCharges || '0'));
+    const gst = parseFloat(String(formData.gst || '0'));
+
+    const computedGross = Number((amount + det + gst).toFixed(2));
+    const currentGross = parseFloat(String(formData.grossAmount || '0'));
+
+    if (Math.abs(computedGross - currentGross) > 0.01) {
+      setFormData(prev => ({ ...prev, grossAmount: String(computedGross) }));
     }
   }, [formData.amount, formData.detCharges, formData.gst]);
   const handleSubmit = (e: React.FormEvent) => {
@@ -1254,7 +1271,7 @@ function OutwardEntryDetails({ entry }: { entry: OutwardEntry }) {
             <div>
               <p className="text-sm text-muted-foreground">Gross Amount</p>
               <p className="font-medium text-foreground text-lg">
-                ₹{Number(entry.invoice.grandTotal).toLocaleString()}
+                {entry.grossAmount ? `₹${Number(entry.grossAmount).toLocaleString()}` : (entry.invoice?.grandTotal ? `₹${Number(entry.invoice.grandTotal).toLocaleString()}` : '-')}
               </p>
             </div>
             <div>

@@ -3,7 +3,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import logo from '@/assets/logo.png';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -30,11 +31,11 @@ export default function Login() {
         <div className="glass-card p-8 space-y-6">
           {/* Logo/Header */}
           <div className="text-center space-y-2">
-            <div className="flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/20 mx-auto mb-4">
-              <Building2 className="w-8 h-8 text-primary" />
+            <div className="flex items-center justify-center w-24 h-24 rounded-2xl bg-white mx-auto mb-6 p-2 shadow-sm">
+              <img src={logo} alt="GHMC Logo" className="w-full h-full object-contain" />
             </div>
-            <h1 className="text-2xl font-bold text-foreground">Chemical Waste Management</h1>
-            <p className="text-sm text-muted-foreground">Sign in to your account</p>
+            <h1 className="text-xl font-bold text-foreground leading-tight px-4">GUJARAT HAZARD WASTE MANAGEMENT & CO.</h1>
+            <p className="text-sm text-muted-foreground mt-2">Sign in to your account</p>
           </div>
 
           {/* Login Form */}

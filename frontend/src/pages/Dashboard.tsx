@@ -108,7 +108,7 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <MainLayout title="Dashboard" subtitle="Chemical Waste Management Overview">
+      <MainLayout title="Dashboard" subtitle="GUJARAT HAZARD WASTE MANAGEMENT & CO. Overview">
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
@@ -117,7 +117,7 @@ export default function Dashboard() {
   }
 
   return (
-    <MainLayout title="Dashboard" subtitle="Chemical Waste Management Overview">
+    <MainLayout title="Dashboard" subtitle="GUJARAT HAZARD WASTE MANAGEMENT & CO. Overview">
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <StatCard

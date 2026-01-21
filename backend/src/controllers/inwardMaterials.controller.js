@@ -61,6 +61,7 @@ class InwardMaterialsController {
   async createMaterial(req, res, next) {
     try {
       const materialData = req.body;
+      logger.info('Create Inward Material Body:', JSON.stringify(materialData, null, 2));
       const material = await inwardMaterialsService.createMaterial(materialData);
 
       logger.info(`Inward material created: ${material.id}`);
@@ -83,6 +84,7 @@ class InwardMaterialsController {
     try {
       const { id } = req.params;
       const updateData = req.body;
+      logger.info('Update Inward Material Body:', JSON.stringify(updateData, null, 2));
       const material = await inwardMaterialsService.updateMaterial(id, updateData);
 
       logger.info(`Inward material updated: ${material.id}`);

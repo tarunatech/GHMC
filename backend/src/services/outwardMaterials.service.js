@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { NotFoundError, ValidationError } from '../utils/errors.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Outward Materials Service
@@ -18,7 +19,7 @@ class OutwardMaterialsService {
             limit = 20,
             outwardEntryId = '',
             search = '',
-            sortBy = 'createdAt',
+            sortBy = 'updatedAt',
             sortOrder = 'desc',
         } = options;
 
@@ -114,11 +115,22 @@ class OutwardMaterialsService {
             invoiceNo,
             vehicleCapacity,
             rate,
+            amount,
             detCharges,
             gst,
+            grossAmount,
             month,
             paidOn,
         } = materialData;
+
+        logger.info('Creating outward material with data:', JSON.stringify({
+            outwardEntryId,
+            transporterName,
+            quantity,
+            rate,
+            amount,
+            grossAmount
+        }));
 
         // Validate required fields
         if (!transporterName) {
@@ -136,44 +148,63 @@ class OutwardMaterialsService {
             }
         }
 
-        // Calculate amount if rate and quantity provided
-        let amount = null;
-        if (rate && quantity) {
-            amount = parseFloat(rate) * parseFloat(quantity);
+        // Parse numeric fields safely
+        const safeRate = (rate !== undefined && rate !== null && rate !== '') ? parseFloat(rate) : null;
+        const safeQuantity = (quantity !== undefined && quantity !== null && quantity !== '') ? parseFloat(quantity) : null;
+        let safeAmount = (amount !== undefined && amount !== null && amount !== '') ? parseFloat(amount) : null;
+        const safeDetCharges = (detCharges !== undefined && detCharges !== null && detCharges !== '') ? parseFloat(detCharges) : null;
+        const safeGst = (gst !== undefined && gst !== null && gst !== '') ? parseFloat(gst) : null;
+        let safeGrossAmount = (grossAmount !== undefined && grossAmount !== null && grossAmount !== '') ? parseFloat(grossAmount) : null;
+
+        // Parse Vehicle Capacity safely for calculation
+        const safeVehicleCapacity = (vehicleCapacity !== undefined && vehicleCapacity !== null && vehicleCapacity !== '') ? parseFloat(vehicleCapacity) : null;
+
+        // Backend Failsafe: Calculate Amount if missing but Rate & Vehicle Capacity exist
+        // Formula changed: Amount = Rate * Vehicle Capacity (was Quantity)
+        if (safeAmount === null && safeRate !== null && safeVehicleCapacity !== null) {
+            safeAmount = parseFloat((safeRate * safeVehicleCapacity).toFixed(2));
+            logger.info(`Backend auto-calculated Amount: ${safeAmount} from Rate: ${safeRate} * VehCap: ${safeVehicleCapacity}`);
         }
 
-        // Calculate gross amount
-        let grossAmount = amount || 0;
-        if (detCharges) {
-            grossAmount += parseFloat(detCharges);
+        // Backend Failsafe: Calculate Gross Amount if missing but components exist
+        if (safeGrossAmount === null) {
+            const baseForGross = safeAmount || 0;
+            const detForGross = safeDetCharges || 0;
+            const gstForGross = safeGst || 0;
+            if (safeAmount !== null || safeDetCharges !== null || safeGst !== null) {
+                safeGrossAmount = parseFloat((baseForGross + detForGross + gstForGross).toFixed(2));
+                logger.info(`Backend auto-calculated GrossAmount: ${safeGrossAmount}`);
+            }
         }
-        if (gst) {
-            grossAmount += parseFloat(gst);
-        }
+
+        // Build safe data object
+        const data = {
+            outwardEntryId: outwardEntryId || null,
+            srNo: materialData.srNo || null,
+            date: date ? new Date(date) : null,
+            cementCompany: cementCompany?.trim() || null,
+            manifestNo: manifestNo?.trim() || null,
+            vehicleNo: vehicleNo?.trim() || null,
+            wasteName: wasteName?.trim() || null,
+            month: month?.trim() || null,
+            quantity: safeQuantity,
+            unit: unit?.trim() || null,
+            transporterName: transporterName?.trim() || '',
+            invoiceNo: invoiceNo?.trim() || null,
+            vehicleCapacity: vehicleCapacity?.trim() || null,
+            rate: safeRate,
+            amount: safeAmount,
+            detCharges: safeDetCharges,
+            gst: safeGst,
+            grossAmount: safeGrossAmount,
+            paidOn: paidOn ? new Date(paidOn) : null,
+        };
+
+        logger.info('Creating outward material with safe data:', JSON.stringify(data));
 
         // Create material
         const material = await prisma.outwardMaterial.create({
-            data: {
-                outwardEntryId: outwardEntryId || null,
-                srNo: materialData.srNo || null,
-                date: date ? new Date(date) : null,
-                cementCompany: cementCompany?.trim() || null,
-                manifestNo: manifestNo?.trim() || null,
-                vehicleNo: vehicleNo?.trim() || null,
-                wasteName: wasteName?.trim() || null,
-                month: month?.trim() || null,
-                quantity: quantity ? parseFloat(quantity) : null,
-                unit: unit?.trim() || null,
-                transporterName: transporterName.trim(),
-                invoiceNo: invoiceNo?.trim() || null,
-                vehicleCapacity: vehicleCapacity?.trim() || null,
-                rate: rate ? parseFloat(rate) : null,
-                amount: amount,
-                detCharges: detCharges ? parseFloat(detCharges) : null,
-                gst: gst ? parseFloat(gst) : null,
-                grossAmount: grossAmount || null,
-                paidOn: paidOn ? new Date(paidOn) : null,
-            },
+            data,
             include: {
                 outwardEntry: true,
             },
@@ -189,59 +220,76 @@ class OutwardMaterialsService {
      * @returns {Promise<object>} Updated material
      */
     async updateMaterial(materialId, updateData) {
-        await this.getMaterialById(materialId); // Check if exists
+        // Prepare safe values
+        let safeRate = undefined;
+        if (updateData.rate !== undefined) safeRate = (updateData.rate !== null && updateData.rate !== '') ? parseFloat(updateData.rate) : null;
 
-        // Recalculate amount and gross amount if rate/quantity changed
-        let amount = updateData.amount;
-        if (updateData.rate !== undefined || updateData.quantity !== undefined) {
-            const material = await this.getMaterialById(materialId);
-            const rate = updateData.rate !== undefined ? parseFloat(updateData.rate) : Number(material.rate);
-            const quantity = updateData.quantity !== undefined ? parseFloat(updateData.quantity) : Number(material.quantity);
+        let safeQuantity = undefined;
+        if (updateData.quantity !== undefined) safeQuantity = (updateData.quantity !== null && updateData.quantity !== '') ? parseFloat(updateData.quantity) : null;
 
-            if (rate && quantity) {
-                amount = rate * quantity;
+        let safeAmount = undefined;
+        if (updateData.amount !== undefined) safeAmount = (updateData.amount !== null && updateData.amount !== '') ? parseFloat(updateData.amount) : null;
+
+        let safeDetCharges = undefined;
+        if (updateData.detCharges !== undefined) safeDetCharges = (updateData.detCharges !== null && updateData.detCharges !== '') ? parseFloat(updateData.detCharges) : null;
+
+        let safeGst = undefined;
+        if (updateData.gst !== undefined) safeGst = (updateData.gst !== null && updateData.gst !== '') ? parseFloat(updateData.gst) : null;
+
+        let safeGrossAmount = undefined;
+        if (updateData.grossAmount !== undefined) safeGrossAmount = (updateData.grossAmount !== null && updateData.grossAmount !== '') ? parseFloat(updateData.grossAmount) : null;
+
+        const existingMaterial = await this.getMaterialById(materialId);
+
+        const finalRate = safeRate !== undefined ? safeRate : Number(existingMaterial.rate);
+        const finalVehicleCapacity = (updateData.vehicleCapacity !== undefined) ? (updateData.vehicleCapacity ? parseFloat(updateData.vehicleCapacity) : 0) : Number(existingMaterial.vehicleCapacity || 0);
+
+        if ((safeAmount === undefined || safeAmount === null) && finalRate && finalVehicleCapacity) {
+            const shouldRecalc = safeAmount === null || safeRate !== undefined || updateData.vehicleCapacity !== undefined;
+            if (shouldRecalc) {
+                safeAmount = parseFloat((finalRate * finalVehicleCapacity).toFixed(2));
+                logger.info(`Backend UPDATE auto-calculated Amount: ${safeAmount} from Rate: ${finalRate} * VehCap: ${finalVehicleCapacity}`);
             }
         }
 
-        // Recalculate gross amount
-        let grossAmount = amount || 0;
-        if (updateData.detCharges !== undefined) {
-            grossAmount += parseFloat(updateData.detCharges) || 0;
-        } else {
-            const material = await this.getMaterialById(materialId);
-            grossAmount += Number(material.detCharges) || 0;
+        const finalAmount = safeAmount !== undefined ? safeAmount : Number(existingMaterial.amount);
+        const finalDet = safeDetCharges !== undefined ? safeDetCharges : Number(existingMaterial.detCharges || 0);
+        const finalGst = safeGst !== undefined ? safeGst : Number(existingMaterial.gst || 0);
+
+        if ((safeGrossAmount === undefined || safeGrossAmount === null)) {
+            const shouldRecalcGross = safeGrossAmount === null || safeAmount !== undefined || safeDetCharges !== undefined || safeGst !== undefined;
+            if (shouldRecalcGross) {
+                safeGrossAmount = parseFloat(((finalAmount || 0) + finalDet + finalGst).toFixed(2));
+                logger.info(`Backend UPDATE auto-calculated Gross: ${safeGrossAmount}`);
+            }
         }
 
-        if (updateData.gst !== undefined) {
-            grossAmount += parseFloat(updateData.gst) || 0;
-        } else {
-            const material = await this.getMaterialById(materialId);
-            grossAmount += Number(material.gst) || 0;
-        }
+        const updateMap = {};
+        if (updateData.outwardEntryId !== undefined) updateMap.outwardEntryId = updateData.outwardEntryId || null;
+        if (updateData.date !== undefined) updateMap.date = updateData.date ? new Date(updateData.date) : null;
+        if (updateData.cementCompany !== undefined) updateMap.cementCompany = updateData.cementCompany?.trim() || null;
+        if (updateData.manifestNo !== undefined) updateMap.manifestNo = updateData.manifestNo?.trim() || null;
+        if (updateData.vehicleNo !== undefined) updateMap.vehicleNo = updateData.vehicleNo?.trim() || null;
+        if (updateData.wasteName !== undefined) updateMap.wasteName = updateData.wasteName?.trim() || null;
+        if (updateData.month !== undefined) updateMap.month = updateData.month?.trim() || null;
+        if (safeQuantity !== undefined) updateMap.quantity = safeQuantity;
+        if (updateData.unit !== undefined) updateMap.unit = updateData.unit?.trim() || null;
+        if (updateData.transporterName !== undefined) updateMap.transporterName = updateData.transporterName?.trim() || '';
+        if (updateData.invoiceNo !== undefined) updateMap.invoiceNo = updateData.invoiceNo?.trim() || null;
+        if (updateData.vehicleCapacity !== undefined) updateMap.vehicleCapacity = updateData.vehicleCapacity?.trim() || null;
+
+        if (safeRate !== undefined) updateMap.rate = safeRate;
+        if (safeAmount !== undefined) updateMap.amount = safeAmount;
+        if (safeDetCharges !== undefined) updateMap.detCharges = safeDetCharges;
+        if (safeGst !== undefined) updateMap.gst = safeGst;
+        if (safeGrossAmount !== undefined) updateMap.grossAmount = safeGrossAmount;
+
+        if (updateData.paidOn !== undefined) updateMap.paidOn = updateData.paidOn ? new Date(updateData.paidOn) : null;
 
         // Update material
         const updated = await prisma.outwardMaterial.update({
             where: { id: materialId },
-            data: {
-                ...(updateData.outwardEntryId !== undefined && { outwardEntryId: updateData.outwardEntryId || null }),
-                ...(updateData.date !== undefined && { date: updateData.date ? new Date(updateData.date) : null }),
-                ...(updateData.cementCompany !== undefined && { cementCompany: updateData.cementCompany?.trim() || null }),
-                ...(updateData.manifestNo !== undefined && { manifestNo: updateData.manifestNo?.trim() || null }),
-                ...(updateData.vehicleNo !== undefined && { vehicleNo: updateData.vehicleNo?.trim() || null }),
-                ...(updateData.wasteName !== undefined && { wasteName: updateData.wasteName?.trim() || null }),
-                ...(updateData.month !== undefined && { month: updateData.month?.trim() || null }),
-                ...(updateData.quantity !== undefined && { quantity: updateData.quantity ? parseFloat(updateData.quantity) : null }),
-                ...(updateData.unit !== undefined && { unit: updateData.unit?.trim() || null }),
-                ...(updateData.transporterName !== undefined && { transporterName: updateData.transporterName.trim() }),
-                ...(updateData.invoiceNo !== undefined && { invoiceNo: updateData.invoiceNo?.trim() || null }),
-                ...(updateData.vehicleCapacity !== undefined && { vehicleCapacity: updateData.vehicleCapacity?.trim() || null }),
-                ...(updateData.rate !== undefined && { rate: updateData.rate ? parseFloat(updateData.rate) : null }),
-                ...(updateData.detCharges !== undefined && { detCharges: updateData.detCharges ? parseFloat(updateData.detCharges) : null }),
-                ...(updateData.gst !== undefined && { gst: updateData.gst ? parseFloat(updateData.gst) : null }),
-                ...(updateData.paidOn !== undefined && { paidOn: updateData.paidOn ? new Date(updateData.paidOn) : null }),
-                ...(amount !== undefined && { amount }),
-                ...(grossAmount !== undefined && { grossAmount }),
-            },
+            data: updateMap,
             include: {
                 outwardEntry: true,
             },

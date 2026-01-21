@@ -211,7 +211,6 @@ export default function Transporters() {
           </div>
           <div>
             <p className="font-medium text-foreground">{transporter.name}</p>
-            <p className="text-xs text-muted-foreground">{transporter.vehicleCount || 0} vehicles</p>
           </div>
         </div>
       ),

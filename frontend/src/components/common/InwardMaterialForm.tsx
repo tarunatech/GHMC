@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { InwardMaterial, CreateInwardMaterialData } from "@/services/inward.service";
 import transportersService from "@/services/transporters.service";
 import { useQuery } from "@tanstack/react-query";
@@ -17,27 +17,55 @@ interface Props {
 export default function InwardMaterialForm({ onCancel, onSubmit, entry, inwardEntries = [], isLoading }: Props) {
   const { user } = useAuth();
   const [formData, setFormData] = useState<CreateInwardMaterialData>({
-    inwardEntryId: entry?.inwardEntryId || undefined,
+    inwardEntryId: entry?.inwardEntryId ?? undefined,
     date: entry?.date ? new Date(entry.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
-    lotNo: entry?.lotNo || undefined,
-    companyId: entry?.companyId || undefined,
-    manifestNo: entry?.manifestNo || undefined,
-    month: entry?.month || undefined,
-    vehicleNo: entry?.vehicleNo || undefined,
-    wasteName: entry?.wasteName || undefined,
-    category: entry?.category || undefined,
-    quantity: entry?.quantity || undefined,
-    unit: (entry?.unit as "MT" | "Kg" | "KL") || undefined,
-    transporterName: entry?.transporterName || '',
-    invoiceNo: entry?.invoiceNo || undefined,
-    vehicleCapacity: entry?.vehicleCapacity || undefined,
-    rate: entry?.rate || undefined,
-    amount: entry?.amount || undefined,
-    detCharges: entry?.detCharges || undefined,
-    gst: entry?.gst || undefined,
-    grossAmount: entry?.grossAmount || undefined,
+    lotNo: entry?.lotNo ?? undefined,
+    companyId: entry?.companyId ?? undefined,
+    manifestNo: entry?.manifestNo ?? undefined,
+    month: entry?.month ?? undefined,
+    vehicleNo: entry?.vehicleNo ?? undefined,
+    wasteName: entry?.wasteName ?? undefined,
+    category: entry?.category ?? undefined,
+    quantity: (entry?.quantity !== null && entry?.quantity !== undefined) ? Number(entry.quantity) : undefined,
+    unit: (entry?.unit as "MT" | "Kg" | "KL") ?? undefined,
+    transporterName: entry?.transporterName ?? '',
+    invoiceNo: entry?.invoiceNo ?? undefined,
+    vehicleCapacity: entry?.vehicleCapacity ?? undefined,
+    rate: (entry?.rate !== null && entry?.rate !== undefined) ? Number(entry.rate) : undefined,
+    amount: (entry?.amount !== null && entry?.amount !== undefined) ? Number(entry.amount) : undefined,
+    detCharges: (entry?.detCharges !== null && entry?.detCharges !== undefined) ? Number(entry.detCharges) : undefined,
+    gst: (entry?.gst !== null && entry?.gst !== undefined) ? Number(entry.gst) : undefined,
+    grossAmount: (entry?.grossAmount !== null && entry?.grossAmount !== undefined) ? Number(entry.grossAmount) : undefined,
     paidOn: entry?.paidOn ? new Date(entry.paidOn).toISOString().slice(0, 10) : undefined,
   });
+
+  // Reset form when entry changes (critical for edit mode)
+  useEffect(() => {
+    if (entry) {
+      setFormData({
+        inwardEntryId: entry.inwardEntryId ?? undefined,
+        date: entry.date ? new Date(entry.date).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10),
+        lotNo: entry.lotNo ?? undefined,
+        companyId: entry.companyId ?? undefined,
+        manifestNo: entry.manifestNo ?? undefined,
+        month: entry.month ?? undefined,
+        vehicleNo: entry.vehicleNo ?? undefined,
+        wasteName: entry.wasteName ?? undefined,
+        category: entry.category ?? undefined,
+        quantity: (entry.quantity !== null && entry.quantity !== undefined) ? Number(entry.quantity) : undefined,
+        unit: (entry.unit as "MT" | "Kg" | "KL") ?? undefined,
+        transporterName: entry.transporterName ?? '',
+        invoiceNo: entry.invoiceNo ?? undefined,
+        vehicleCapacity: entry.vehicleCapacity ?? undefined,
+        rate: (entry.rate !== null && entry.rate !== undefined) ? Number(entry.rate) : undefined,
+        amount: (entry.amount !== null && entry.amount !== undefined) ? Number(entry.amount) : undefined,
+        detCharges: (entry.detCharges !== null && entry.detCharges !== undefined) ? Number(entry.detCharges) : undefined,
+        gst: (entry.gst !== null && entry.gst !== undefined) ? Number(entry.gst) : undefined,
+        grossAmount: (entry.grossAmount !== null && entry.grossAmount !== undefined) ? Number(entry.grossAmount) : undefined,
+        paidOn: entry.paidOn ? new Date(entry.paidOn).toISOString().slice(0, 10) : undefined,
+      });
+    }
+  }, [entry]);
 
   // Fetch transporters
   const { data: transportersData } = useQuery({
@@ -47,35 +75,83 @@ export default function InwardMaterialForm({ onCancel, onSubmit, entry, inwardEn
 
   const transporters = transportersData?.transporters || [];
 
+  const prevInwardEntryId = useRef(entry?.inwardEntryId);
+
   // Auto-populate from selected entry
   useEffect(() => {
-    if (formData.inwardEntryId && inwardEntries.length > 0) {
+    // Only auto-populate if:
+    // 1. A new inwardEntryId is selected
+    // 2. AND it's different from the previous selection
+    // 3. AND it's not the initial value during Edit mode
+    if (formData.inwardEntryId && formData.inwardEntryId !== prevInwardEntryId.current) {
       const selectedEntry = inwardEntries.find(e => e.id === formData.inwardEntryId);
       if (selectedEntry) {
         setFormData(prev => ({
           ...prev,
           date: selectedEntry.date ? new Date(selectedEntry.date).toISOString().slice(0, 10) : prev.date,
-          lotNo: selectedEntry.lotNo || prev.lotNo,
-          companyId: selectedEntry.companyId || prev.companyId,
-          manifestNo: selectedEntry.manifestNo || prev.manifestNo,
-          vehicleNo: selectedEntry.vehicleNo || prev.vehicleNo,
-          wasteName: selectedEntry.wasteName || prev.wasteName,
-          category: selectedEntry.category || prev.category,
-          quantity: selectedEntry.quantity || prev.quantity,
-          unit: selectedEntry.unit || prev.unit,
+          lotNo: selectedEntry.lotNo ?? prev.lotNo,
+          companyId: selectedEntry.companyId ?? prev.companyId,
+          manifestNo: selectedEntry.manifestNo ?? prev.manifestNo,
+          vehicleNo: selectedEntry.vehicleNo ?? prev.vehicleNo,
+          wasteName: selectedEntry.wasteName ?? prev.wasteName,
+          category: selectedEntry.category ?? prev.category,
+          quantity: (selectedEntry.quantity !== null && selectedEntry.quantity !== undefined) ? Number(selectedEntry.quantity) : prev.quantity,
+          month: selectedEntry.month ?? prev.month,
+          // Explicitly clear invoicing data when importing a new entry
+          rate: undefined,
+          amount: undefined,
+          detCharges: undefined,
+          gst: undefined,
+          grossAmount: undefined,
+          invoiceNo: undefined,
+          paidOn: undefined,
         }));
       }
     }
+    prevInwardEntryId.current = formData.inwardEntryId;
   }, [formData.inwardEntryId, inwardEntries]);
 
-  // Calculate gross amount
+  // Handle auto-calculation
+  // Handle auto-calculation
   useEffect(() => {
-    const amount = formData.amount || 0;
-    const detCharges = formData.detCharges || 0;
-    const gst = formData.gst || 0;
-    const grossAmount = amount + detCharges + gst;
-    setFormData(prev => ({ ...prev, grossAmount }));
-  }, [formData.amount, formData.detCharges, formData.gst]);
+    const rate = Number(formData.rate) || 0;
+    // Calculation changed from Quantity to Vehicle Capacity as per user request
+    const vehicleCapacity = Number(formData.vehicleCapacity) || 0;
+    const detCharges = Number(formData.detCharges) || 0;
+    const gst = Number(formData.gst) || 0;
+
+    const calculatedAmount = Number((rate * vehicleCapacity).toFixed(2));
+    // Gross Amount = Amount + DetCharges + GST
+    // We use calculatedAmount if we just calculated it, otherwise use existing amount? 
+    // Actually, if we are in this effect, it means rate/cap/det/gst changed.
+    // If rate/cap changed, amount changes.
+    // If det/gst changed, gross changes.
+
+    setFormData(prev => {
+      const updates: any = {};
+
+      // Calculate amount based on current inputs
+      // logic: change amount if it differs from calculated (and inputs are sufficient to imply intent i.e. not both 0?)
+      // actually, just always calc. If 0, it becomes 0.
+      if (calculatedAmount !== prev.amount) {
+        updates.amount = calculatedAmount;
+      }
+
+      // Calculate gross based on the (potentially new) amount
+      const currentAmount = updates.amount !== undefined ? updates.amount : (prev.amount || 0);
+      const newGross = Number((currentAmount + detCharges + gst).toFixed(2));
+
+      if (newGross !== prev.grossAmount) {
+        updates.grossAmount = newGross;
+      }
+
+      if (Object.keys(updates).length > 0) {
+        return { ...prev, ...updates };
+      }
+      return prev;
+    });
+  }, [formData.rate, formData.vehicleCapacity, formData.detCharges, formData.gst]);
+
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -180,8 +256,8 @@ export default function InwardMaterialForm({ onCancel, onSubmit, entry, inwardEn
             type="number"
             step="0.01"
             className="input-field w-full"
-            value={formData.quantity || ''}
-            onChange={(e) => setFormData({ ...formData, quantity: parseFloat(e.target.value) || undefined })}
+            value={formData.quantity ?? ''}
+            onChange={(e) => setFormData({ ...formData, quantity: e.target.value === '' ? null : parseFloat(e.target.value) })}
           />
         </div>
         <div>
@@ -245,8 +321,8 @@ export default function InwardMaterialForm({ onCancel, onSubmit, entry, inwardEn
                 type="number"
                 step="0.01"
                 className="input-field w-full"
-                value={formData.rate || ''}
-                onChange={(e) => setFormData({ ...formData, rate: parseFloat(e.target.value) || undefined })}
+                value={formData.rate ?? ''}
+                onChange={(e) => setFormData({ ...formData, rate: e.target.value === '' ? null : parseFloat(e.target.value) })}
               />
             </div>
             <div>
@@ -255,8 +331,8 @@ export default function InwardMaterialForm({ onCancel, onSubmit, entry, inwardEn
                 type="number"
                 step="0.01"
                 className="input-field w-full"
-                value={formData.amount || ''}
-                onChange={(e) => setFormData({ ...formData, amount: parseFloat(e.target.value) || undefined })}
+                value={formData.amount ?? ''}
+                onChange={(e) => setFormData({ ...formData, amount: e.target.value === '' ? null : parseFloat(e.target.value) })}
               />
             </div>
             <div>
@@ -265,8 +341,8 @@ export default function InwardMaterialForm({ onCancel, onSubmit, entry, inwardEn
                 type="number"
                 step="0.01"
                 className="input-field w-full"
-                value={formData.detCharges || ''}
-                onChange={(e) => setFormData({ ...formData, detCharges: parseFloat(e.target.value) || undefined })}
+                value={formData.detCharges ?? ''}
+                onChange={(e) => setFormData({ ...formData, detCharges: e.target.value === '' ? null : parseFloat(e.target.value) })}
               />
             </div>
           </div>
@@ -278,8 +354,8 @@ export default function InwardMaterialForm({ onCancel, onSubmit, entry, inwardEn
                 type="number"
                 step="0.01"
                 className="input-field w-full"
-                value={formData.gst || ''}
-                onChange={(e) => setFormData({ ...formData, gst: parseFloat(e.target.value) || undefined })}
+                value={formData.gst ?? ''}
+                onChange={(e) => setFormData({ ...formData, gst: e.target.value === '' ? null : parseFloat(e.target.value) })}
               />
             </div>
             <div>
@@ -287,9 +363,9 @@ export default function InwardMaterialForm({ onCancel, onSubmit, entry, inwardEn
               <input
                 type="number"
                 step="0.01"
-                className="input-field w-full bg-muted/10"
-                value={formData.grossAmount || ''}
-                readOnly
+                className="input-field w-full"
+                value={formData.grossAmount ?? ''}
+                onChange={(e) => setFormData({ ...formData, grossAmount: e.target.value === '' ? null : parseFloat(e.target.value) })}
               />
             </div>
             <div>

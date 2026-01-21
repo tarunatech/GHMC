@@ -57,6 +57,14 @@ export const config = {
     user: process.env.SMTP_USER,
     pass: process.env.SMTP_PASS,
   },
+
+  storage: {
+    endpoint: process.env.R2_ENDPOINT,
+    accessKeyId: process.env.R2_ACCESS_KEY_ID,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY,
+    bucketName: process.env.R2_BUCKET_NAME,
+    publicUrl: process.env.R2_PUBLIC_URL,
+  },
 };
 
 export default config;
