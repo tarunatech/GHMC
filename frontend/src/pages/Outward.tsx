@@ -629,7 +629,7 @@ export default function Outward() {
             <h2 className="text-xl font-semibold text-foreground">Outward Transporter Records</h2>
             <p className="text-sm text-muted-foreground">Manage transporter invoices and payments for outward/dispatch</p>
           </div>
-          {['admin', 'superadmin'].includes(user?.role || '') && (
+          {user?.role === 'superadmin' && (
             <Button onClick={() => {
               setEditingMaterial(null);
               setIsMaterialModalOpen(true);
@@ -663,7 +663,7 @@ export default function Outward() {
               header: "Actions",
               render: (m: OutwardMaterial) => (
                 <div className="flex items-center gap-2">
-                  {['admin', 'superadmin'].includes(user?.role || '') && (
+                  {user?.role === 'superadmin' && (
                     <>
                       <button
                         onClick={() => {

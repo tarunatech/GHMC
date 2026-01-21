@@ -710,7 +710,7 @@ export default function Inward() {
             <h2 className="text-xl font-semibold text-foreground">Inward Transporter Records</h2>
             <p className="text-sm text-muted-foreground">Manage transporter invoices and payments</p>
           </div>
-          {['admin', 'superadmin'].includes(user?.role || '') && (
+          {user?.role === 'superadmin' && (
             <Button onClick={() => setIsMaterialModalOpen(true)}>
               <Plus className="w-4 h-4 mr-2" /> Add Material Record
             </Button>
@@ -743,7 +743,7 @@ export default function Inward() {
               header: "Actions",
               render: (m: InwardMaterial) => (
                 <div className="flex items-center gap-2">
-                  {['admin', 'superadmin'].includes(user?.role || '') && (
+                  {user?.role === 'superadmin' && (
                     <>
                       <button
                         onClick={() => {
