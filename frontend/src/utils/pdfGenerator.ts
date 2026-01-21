@@ -56,7 +56,7 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   doc.setTextColor(greenColor);
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  const text1 = 'GUJARAT HAZARDWEST';
+  const text1 = 'GUJARAT HAZARD WASTE';
   const text2 = 'MANAGEMENT CO.';
   doc.text(text1, 105, 15, { align: 'center' });
   doc.text(text2, 105, 23, { align: 'center' });
@@ -346,14 +346,14 @@ export const generateInvoicePDF = async (invoiceData: any) => {
 
   doc.setFont('helvetica', 'normal');
   doc.text('Bank Name: The Kalupur Commercial Co-Op. Bank Ltd.', 12, finalY + 12);
-  doc.text('Name: GUJARAT HAZARDWEST MANAGEMENT CO.', 12, finalY + 17);
+  doc.text('Name: GUJARAT HAZARD WASTE MANAGEMENT CO.', 12, finalY + 17);
   doc.text('Bank A/c No.: 02420101464', 12, finalY + 22);
   doc.text('IFSC Code: KCCB0VDD024', 12, finalY + 27);
   doc.text('Payment Terms: Immediate', 12, finalY + 32);
 
   // Signature (Right)
   doc.setFontSize(8);
-  doc.text('For GUJARAT HAZARDWEST MANAGEMENT CO.', 107, finalY + 5);
+  doc.text('For GUJARAT HAZARD WASTE MANAGEMENT CO.', 107, finalY + 5);
 
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
