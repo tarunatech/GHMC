@@ -39,7 +39,7 @@ export default function Invoices() {
   const [pageSize, setPageSize] = useState(20);
 
   // Fetch invoices (use debounced search term with pagination)
-  const { data, isLoading, error } = useQuery<{ invoices: Invoice[]; pagination: any }>({
+  const { data, isLoading, isFetching, error } = useQuery<{ invoices: Invoice[]; pagination: any }>({
     queryKey: ['invoices', debouncedSearchTerm, currentPage, pageSize, 'Inward'],
     queryFn: () => invoicesService.getInvoices({
       type: 'Inward',
@@ -316,26 +316,6 @@ export default function Invoices() {
     },
   ];
 
-  if (isLoading) {
-    return (
-      <MainLayout title="Inward Invoices" subtitle="Track and manage vendor payment invoices">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      </MainLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <MainLayout title="Inward Invoices" subtitle="Track and manage vendor payment invoices">
-        <div className="text-center py-12">
-          <p className="text-destructive">Failed to load invoices</p>
-        </div>
-      </MainLayout>
-    );
-  }
-
   return (
     <MainLayout title="Inward Invoices" subtitle="Track and manage vendor payment invoices">
       {/* Actions Bar */}
@@ -467,15 +447,25 @@ export default function Invoices() {
       </div>
 
       {/* Data Table */}
-      <DataTable
-        columns={columns}
-        data={invoices}
-        keyExtractor={(invoice) => invoice.id}
-        emptyMessage="No invoices found"
-        currentPage={pagination.page}
-        totalPages={pagination.totalPages}
-        onPageChange={(page) => setCurrentPage(page)}
-      />
+      {error ? (
+        <div className="text-center py-12 glass-card">
+          <p className="text-destructive">Failed to load invoices. Please try again later.</p>
+          <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["invoices"] })} className="mt-4">
+            Retry
+          </Button>
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={invoices}
+          keyExtractor={(invoice) => invoice.id}
+          emptyMessage="No invoices found"
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={(page) => setCurrentPage(page)}
+          isLoading={isLoading || isFetching}
+        />
+      )}
 
       {/* Invoice Details Modal */}
       <Modal

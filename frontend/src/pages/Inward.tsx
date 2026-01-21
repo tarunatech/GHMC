@@ -69,8 +69,9 @@ export default function Inward() {
       console.log('🔍 Inward API Request Params:', params);
       return inwardService.getEntries(params);
     },
-    staleTime: 1000, // 1 second to prevent rapid re-fetching during typing
-    refetchOnWindowFocus: false, // Don't refetch when window regains focus
+    staleTime: 1000,
+    refetchOnWindowFocus: false,
+    placeholderData: keepPreviousData,
   });
 
   // Fetch statistics (cache for longer)
@@ -445,26 +446,6 @@ export default function Inward() {
     },
   ], [handleDelete, handleCreateInvoice, deleteMutation, user]);
 
-  if (isLoading) {
-    return (
-      <MainLayout title="Inward Management" subtitle="Manage waste collection entries">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      </MainLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <MainLayout title="Inward Management" subtitle="Manage waste collection entries">
-        <div className="text-center py-12">
-          <p className="text-destructive">Failed to load entries</p>
-        </div>
-      </MainLayout>
-    );
-  }
-
   return (
     <MainLayout title="Inward Management" subtitle="Manage waste collection entries">
       <div className="flex flex-col gap-4 mb-6">
@@ -692,16 +673,25 @@ export default function Inward() {
         )}
       </div>
 
-      <DataTable
-        columns={columns}
-        data={entries}
-        keyExtractor={(entry) => entry.id}
-        emptyMessage="No inward entries found"
-        currentPage={pagination.page}
-        totalPages={pagination.totalPages}
-        onPageChange={(page) => setCurrentPage(page)}
-        isLoading={isFetching}
-      />
+      {error ? (
+        <div className="text-center py-12 glass-card">
+          <p className="text-destructive">Failed to load entries. Please try again later.</p>
+          <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["inward"] })} className="mt-4">
+            Retry
+          </Button>
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={entries}
+          keyExtractor={(entry) => entry.id}
+          emptyMessage="No inward entries found"
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={(page) => setCurrentPage(page)}
+          isLoading={isLoading || isFetching}
+        />
+      )}
 
       {/* Inward Materials Section */}
       <div className="mt-8">

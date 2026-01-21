@@ -48,7 +48,8 @@ export default function Companies() {
       page: currentPage,
       limit: pageSize,
     }),
-    staleTime: 0, // Always fetch fresh data when filters change
+    staleTime: 0,
+    placeholderData: keepPreviousData,
   });
 
   // Fetch global stats
@@ -411,26 +412,6 @@ export default function Companies() {
     },
   ];
 
-  if (isLoading) {
-    return (
-      <MainLayout title="Companies" subtitle="Manage waste generator companies">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      </MainLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <MainLayout title="Companies" subtitle="Manage waste generator companies">
-        <div className="text-center py-12">
-          <p className="text-destructive">Failed to load companies</p>
-        </div>
-      </MainLayout>
-    );
-  }
-
   return (
     <MainLayout title="Companies" subtitle="Manage waste generator companies">
       {/* Actions Bar */}
@@ -541,16 +522,25 @@ export default function Companies() {
       </div>
 
       {/* Data Table */}
-      <DataTable
-        columns={columns}
-        data={companies}
-        keyExtractor={(company) => company.id}
-        emptyMessage="No companies found"
-        currentPage={pagination.page}
-        totalPages={pagination.totalPages}
-        onPageChange={(page) => setCurrentPage(page)}
-        isLoading={isFetching}
-      />
+      {error ? (
+        <div className="text-center py-12 glass-card">
+          <p className="text-destructive">Failed to load companies. Please try again later.</p>
+          <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["companies"] })} className="mt-4">
+            Retry
+          </Button>
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={companies}
+          keyExtractor={(company) => company.id}
+          emptyMessage="No companies found"
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={(page) => setCurrentPage(page)}
+          isLoading={isLoading || isFetching}
+        />
+      )}
 
       {/* Add/Edit Company Modal */}
       <Modal

@@ -64,7 +64,8 @@ export default function Outward() {
       page: currentPage,
       limit: pageSize,
     }),
-    staleTime: 0, // Always fetch fresh data when filters change
+    staleTime: 0,
+    placeholderData: keepPreviousData,
   });
 
 
@@ -350,26 +351,6 @@ export default function Outward() {
 
 
 
-  if (isLoading) {
-    return (
-      <MainLayout title="Outward Management" subtitle="Manage waste dispatch to clients">
-        <div className="flex items-center justify-center min-h-[400px]">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        </div>
-      </MainLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <MainLayout title="Outward Management" subtitle="Manage waste dispatch to clients">
-        <div className="text-center py-12">
-          <p className="text-destructive">Failed to load entries</p>
-        </div>
-      </MainLayout>
-    );
-  }
-
   return (
     <MainLayout title="Outward Management" subtitle="Manage waste dispatch to clients">
       <div className="flex flex-col gap-4 mb-6">
@@ -611,16 +592,25 @@ export default function Outward() {
       </div>
 
       <h3 className="text-lg font-medium mb-2">Outward Entries</h3>
-      <DataTable
-        columns={columns}
-        data={entries}
-        keyExtractor={(entry) => entry.id}
-        emptyMessage="No outward entries found"
-        currentPage={pagination.page}
-        totalPages={pagination.totalPages}
-        onPageChange={(page) => setCurrentPage(page)}
-        isLoading={isFetching}
-      />
+      {error ? (
+        <div className="text-center py-12 glass-card">
+          <p className="text-destructive">Failed to load entries. Please try again later.</p>
+          <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["outward"] })} className="mt-4">
+            Retry
+          </Button>
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={entries}
+          keyExtractor={(entry) => entry.id}
+          emptyMessage="No outward entries found"
+          currentPage={pagination.page}
+          totalPages={pagination.totalPages}
+          onPageChange={(page) => setCurrentPage(page)}
+          isLoading={isLoading || isFetching}
+        />
+      )}
 
       {/* Outward Materials Section */}
       <div className="mt-8">

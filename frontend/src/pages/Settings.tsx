@@ -140,283 +140,281 @@ export default function Settings() {
     });
   };
 
-  if (isLoading) {
-    return (
-      <MainLayout title="Settings" subtitle="Manage your ERP preferences">
+  return (
+    <MainLayout title="Settings" subtitle="Manage your ERP preferences">
+      {isLoading ? (
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
-      </MainLayout>
-    );
-  }
-
-  return (
-    <MainLayout title="Settings" subtitle="Manage your ERP preferences">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Profile Settings */}
-        <div className="glass-card p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 rounded-lg bg-primary/20">
-              <User className="w-5 h-5 text-primary" />
-            </div>
-            <h3 className="text-lg font-semibold text-foreground">Profile Settings</h3>
-          </div>
-          <form onSubmit={handleProfileSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Full Name</label>
-              <input
-                type="text"
-                className="input-field w-full"
-                value={profileForm.fullName}
-                onChange={(e) => setProfileForm({ ...profileForm, fullName: e.target.value })}
-                disabled={user?.role === 'admin'}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
-              <input
-                type="email"
-                className="input-field w-full"
-                value={profileForm.email}
-                disabled
-                title="Email cannot be changed"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Phone</label>
-              <input
-                type="tel"
-                className="input-field w-full"
-                value={profileForm.phone}
-                onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
-                disabled={user?.role === 'admin'}
-              />
-            </div>
-            {user?.role !== 'admin' && (
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={updateProfileMutation.isPending}
-              >
-                {updateProfileMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  'Update Profile'
+      ) : (
+        <>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Profile Settings */}
+            <div className="glass-card p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 rounded-lg bg-primary/20">
+                  <User className="w-5 h-5 text-primary" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground">Profile Settings</h3>
+              </div>
+              <form onSubmit={handleProfileSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Full Name</label>
+                  <input
+                    type="text"
+                    className="input-field w-full"
+                    value={profileForm.fullName}
+                    onChange={(e) => setProfileForm({ ...profileForm, fullName: e.target.value })}
+                    disabled={user?.role === 'admin'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
+                  <input
+                    type="email"
+                    className="input-field w-full"
+                    value={profileForm.email}
+                    disabled
+                    title="Email cannot be changed"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Phone</label>
+                  <input
+                    type="tel"
+                    className="input-field w-full"
+                    value={profileForm.phone}
+                    onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })}
+                    disabled={user?.role === 'admin'}
+                  />
+                </div>
+                {user?.role !== 'admin' && (
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={updateProfileMutation.isPending}
+                  >
+                    {updateProfileMutation.isPending ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Update Profile'
+                    )}
+                  </Button>
                 )}
-              </Button>
-            )}
-          </form>
-        </div>
+              </form>
+            </div>
 
-        {/* Company Settings */}
-        <div className="glass-card p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 rounded-lg bg-warning/20">
-              <Building className="w-5 h-5 text-warning" />
-            </div>
-            <h3 className="text-lg font-semibold text-foreground">Company Settings</h3>
-          </div>
-          <fieldset disabled={user?.role === 'admin'}>
-            <form onSubmit={handleCompanySubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Company Name</label>
-                <input
-                  type="text"
-                  className="input-field w-full"
-                  value={companyForm.company_name}
-                  onChange={(e) => setCompanyForm({ ...companyForm, company_name: e.target.value })}
-                />
+            {/* Company Settings */}
+            <div className="glass-card p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 rounded-lg bg-warning/20">
+                  <Building className="w-5 h-5 text-warning" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground">Company Settings</h3>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">GST Number</label>
-                <input
-                  type="text"
-                  className="input-field w-full"
-                  value={companyForm.company_gst_number}
-                  onChange={(e) => setCompanyForm({ ...companyForm, company_gst_number: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Address</label>
-                <textarea
-                  className="input-field w-full min-h-[80px]"
-                  value={companyForm.company_address}
-                  onChange={(e) => setCompanyForm({ ...companyForm, company_address: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Contact</label>
-                <input
-                  type="text"
-                  className="input-field w-full"
-                  value={companyForm.company_contact}
-                  onChange={(e) => setCompanyForm({ ...companyForm, company_contact: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
-                <input
-                  type="email"
-                  className="input-field w-full"
-                  value={companyForm.company_email}
-                  onChange={(e) => setCompanyForm({ ...companyForm, company_email: e.target.value })}
-                />
-              </div>
-              {user?.role !== 'admin' && (
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={updateSettingsMutation.isPending}
-                >
-                  {updateSettingsMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Update Company'
+              <fieldset disabled={user?.role === 'admin'}>
+                <form onSubmit={handleCompanySubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Company Name</label>
+                    <input
+                      type="text"
+                      className="input-field w-full"
+                      value={companyForm.company_name}
+                      onChange={(e) => setCompanyForm({ ...companyForm, company_name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">GST Number</label>
+                    <input
+                      type="text"
+                      className="input-field w-full"
+                      value={companyForm.company_gst_number}
+                      onChange={(e) => setCompanyForm({ ...companyForm, company_gst_number: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Address</label>
+                    <textarea
+                      className="input-field w-full min-h-[80px]"
+                      value={companyForm.company_address}
+                      onChange={(e) => setCompanyForm({ ...companyForm, company_address: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Contact</label>
+                    <input
+                      type="text"
+                      className="input-field w-full"
+                      value={companyForm.company_contact}
+                      onChange={(e) => setCompanyForm({ ...companyForm, company_contact: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
+                    <input
+                      type="email"
+                      className="input-field w-full"
+                      value={companyForm.company_email}
+                      onChange={(e) => setCompanyForm({ ...companyForm, company_email: e.target.value })}
+                    />
+                  </div>
+                  {user?.role !== 'admin' && (
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={updateSettingsMutation.isPending}
+                    >
+                      {updateSettingsMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Update Company'
+                      )}
+                    </Button>
                   )}
-                </Button>
-              )}
-            </form>
-          </fieldset>
-        </div>
+                </form>
+              </fieldset>
+            </div>
 
-        {/* Security Settings */}
-        <div className="glass-card p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="p-2 rounded-lg bg-destructive/20">
-              <Shield className="w-5 h-5 text-destructive" />
-            </div>
-            <h3 className="text-lg font-semibold text-foreground">Security</h3>
-          </div>
-          <fieldset disabled={user?.role === 'admin'}>
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Current Password</label>
-                <input
-                  type="password"
-                  className="input-field w-full"
-                  placeholder="••••••••"
-                  value={passwordForm.currentPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                />
+            {/* Security Settings */}
+            <div className="glass-card p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 rounded-lg bg-destructive/20">
+                  <Shield className="w-5 h-5 text-destructive" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground">Security</h3>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">New Password</label>
-                <input
-                  type="password"
-                  className="input-field w-full"
-                  placeholder="••••••••"
-                  value={passwordForm.newPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-foreground mb-1.5">Confirm Password</label>
-                <input
-                  type="password"
-                  className="input-field w-full"
-                  placeholder="••••••••"
-                  value={passwordForm.confirmPassword}
-                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                />
-              </div>
-              {user?.role !== 'admin' && (
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={changePasswordMutation.isPending}
-                >
-                  {changePasswordMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Changing...
-                    </>
-                  ) : (
-                    'Change Password'
+              <fieldset disabled={user?.role === 'admin'}>
+                <form onSubmit={handlePasswordSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Current Password</label>
+                    <input
+                      type="password"
+                      className="input-field w-full"
+                      placeholder="••••••••"
+                      value={passwordForm.currentPassword}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">New Password</label>
+                    <input
+                      type="password"
+                      className="input-field w-full"
+                      placeholder="••••••••"
+                      value={passwordForm.newPassword}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground mb-1.5">Confirm Password</label>
+                    <input
+                      type="password"
+                      className="input-field w-full"
+                      placeholder="••••••••"
+                      value={passwordForm.confirmPassword}
+                      onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                    />
+                  </div>
+                  {user?.role !== 'admin' && (
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={changePasswordMutation.isPending}
+                    >
+                      {changePasswordMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Changing...
+                        </>
+                      ) : (
+                        'Change Password'
+                      )}
+                    </Button>
                   )}
-                </Button>
-              )}
-            </form>
-          </fieldset>
-        </div>
-      </div>
+                </form>
+              </fieldset>
+            </div>
+          </div>
 
-      {/* Invoice Settings */}
-      <div className="glass-card p-6 mt-6">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="p-2 rounded-lg bg-chart-4/20">
-            <FileText className="w-5 h-5 text-chart-4" />
-          </div>
-          <h3 className="text-lg font-semibold text-foreground">Invoice Settings</h3>
-        </div>
-        <fieldset disabled={user?.role === 'admin'}>
-          <form onSubmit={handleInvoiceSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Invoice Prefix</label>
-              <input
-                type="text"
-                className="input-field w-full"
-                value={invoiceForm.invoice_number_format}
-                onChange={(e) => setInvoiceForm({ ...invoiceForm, invoice_number_format: e.target.value })}
-                placeholder="INV-YYYYMM"
-              />
-              <p className="text-xs text-muted-foreground mt-1">YYYYMM will be replaced with year and month</p>
+          {/* Invoice Settings */}
+          <div className="glass-card p-6 mt-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 rounded-lg bg-chart-4/20">
+                <FileText className="w-5 h-5 text-chart-4" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground">Invoice Settings</h3>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">CGST Rate (%)</label>
-              <input
-                type="number"
-                step="0.01"
-                className="input-field w-full"
-                value={invoiceForm.cgst_rate}
-                onChange={(e) => setInvoiceForm({ ...invoiceForm, cgst_rate: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">SGST Rate (%)</label>
-              <input
-                type="number"
-                step="0.01"
-                className="input-field w-full"
-                value={invoiceForm.sgst_rate}
-                onChange={(e) => setInvoiceForm({ ...invoiceForm, sgst_rate: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Payment Terms (Days)</label>
-              <input
-                type="number"
-                className="input-field w-full"
-                value={invoiceForm.payment_terms}
-                onChange={(e) => setInvoiceForm({ ...invoiceForm, payment_terms: e.target.value })}
-              />
-            </div>
-            <div className="md:col-span-2">
-              {user?.role !== 'admin' && (
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={updateSettingsMutation.isPending}
-                >
-                  {updateSettingsMutation.isPending ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    'Save Settings'
+            <fieldset disabled={user?.role === 'admin'}>
+              <form onSubmit={handleInvoiceSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Invoice Prefix</label>
+                  <input
+                    type="text"
+                    className="input-field w-full"
+                    value={invoiceForm.invoice_number_format}
+                    onChange={(e) => setInvoiceForm({ ...invoiceForm, invoice_number_format: e.target.value })}
+                    placeholder="INV-YYYYMM"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">YYYYMM will be replaced with year and month</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">CGST Rate (%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input-field w-full"
+                    value={invoiceForm.cgst_rate}
+                    onChange={(e) => setInvoiceForm({ ...invoiceForm, cgst_rate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">SGST Rate (%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input-field w-full"
+                    value={invoiceForm.sgst_rate}
+                    onChange={(e) => setInvoiceForm({ ...invoiceForm, sgst_rate: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">Payment Terms (Days)</label>
+                  <input
+                    type="number"
+                    className="input-field w-full"
+                    value={invoiceForm.payment_terms}
+                    onChange={(e) => setInvoiceForm({ ...invoiceForm, payment_terms: e.target.value })}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  {user?.role !== 'admin' && (
+                    <Button
+                      type="submit"
+                      className="w-full"
+                      disabled={updateSettingsMutation.isPending}
+                    >
+                      {updateSettingsMutation.isPending ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        'Save Settings'
+                      )}
+                    </Button>
                   )}
-                </Button>
-              )}
-            </div>
-          </form>
-        </fieldset>
-      </div>
+                </div>
+              </form>
+            </fieldset>
+          </div>
+        </>
+      )}
     </MainLayout>
   );
 }
