@@ -182,7 +182,12 @@ export default function Invoices() {
         grandTotal: fullInvoice.grandTotal
       };
 
-      await generateInvoicePDF(pdfData);
+      const pdfBlob = await generateInvoicePDF(pdfData);
+
+      // Upload to R2 in background
+      invoicesService.uploadInvoice(fullInvoice.id, pdfBlob, `Invoice_${fullInvoice.invoiceNo}.pdf`)
+        .catch(err => console.error('R2 Upload failed:', err));
+
       toast.success("Invoice downloaded successfully");
     } catch (error) {
       console.error(error);

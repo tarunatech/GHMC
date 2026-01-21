@@ -371,4 +371,7 @@ export const generateInvoicePDF = async (invoiceData: any) => {
 
   // Save PDF
   doc.save(`Invoice_${invoiceData.invoiceNo}.pdf`);
+
+  // Return the blob for uploading
+  return doc.output('blob');
 };

@@ -233,6 +233,20 @@ class InvoicesService {
     });
     return response.data.data.stats;
   }
+
+  /**
+   * Upload invoice PDF
+   */
+  async uploadInvoice(id: string, file: Blob, fileName: string): Promise<any> {
+    const formData = new FormData();
+    formData.append('invoice', file, fileName);
+    const response = await apiClient.post<ApiResponse<any>>(`/invoices/${id}/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data.data;
+  }
 }
 
 export default new InvoicesService();
