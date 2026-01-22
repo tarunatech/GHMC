@@ -75,12 +75,20 @@ export default function Dashboard() {
     refetchInterval: 10000,
   });
 
-  // Format revenue for display
-  const formatRevenue = (amount: number) => {
-    if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)}Cr`;
-    if (amount >= 100000) return `₹${(amount / 100000).toFixed(2)}L`;
-    if (amount >= 1000) return `₹${(amount / 1000).toFixed(2)}K`;
-    return `₹${amount.toLocaleString()}`;
+  // Currency formatting
+  // Use exact formatting anywhere users compare numbers across screens (Invoices vs Dashboard).
+  // Keep compact formatting only where space is limited.
+  const formatCurrencyExact = (amount: number) => {
+    const n = Number(amount) || 0;
+    return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+  };
+
+  const formatCurrencyCompact = (amount: number) => {
+    const n = Number(amount) || 0;
+    if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;
+    if (n >= 100000) return `₹${(n / 100000).toFixed(2)}L`;
+    if (n >= 1000) return `₹${(n / 1000).toFixed(2)}K`;
+    return `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
   };
 
   // Format quantity for display
@@ -136,8 +144,8 @@ export default function Dashboard() {
             />
             <StatCard
               title="Total Inward Revenue (Month)"
-              value={stats ? formatRevenue(stats.revenue.ytd) : "₹0"}
-              subtitle={`Paid: ${stats ? formatRevenue(stats.revenue.paid) : "₹0"} | Pending: ${stats ? formatRevenue(stats.revenue.pending) : "₹0"}`}
+              value={stats ? formatCurrencyExact(stats.revenue.ytd) : "₹0"}
+              subtitle={`Paid: ${stats ? formatCurrencyExact(stats.revenue.paid) : "₹0"} | Pending: ${stats ? formatCurrencyExact(stats.revenue.pending) : "₹0"}`}
               icon={DollarSign}
             />
           </div>
@@ -233,7 +241,7 @@ export default function Dashboard() {
                             borderRadius: "8px",
                             color: "hsl(var(--foreground))",
                           }}
-                          formatter={(value: number) => formatRevenue(value)}
+                          formatter={(value: number) => formatCurrencyExact(value)}
                         />
                       </PieChart>
                     </ResponsiveContainer>
@@ -241,7 +249,7 @@ export default function Dashboard() {
                   <div className="space-y-3 mt-4">
                     <div className="flex items-center justify-between text-sm py-1 border-b border-border/50">
                       <span className="text-muted-foreground">Total Invoiced</span>
-                      <span className="font-bold text-foreground">{formatRevenue(paymentStatus.total)}</span>
+                      <span className="font-bold text-foreground">{formatCurrencyExact(paymentStatus.total)}</span>
                     </div>
                     {paymentStatusChartData.map((item) => (
                       <div key={item.name} className="flex items-center justify-between text-sm">
@@ -249,7 +257,7 @@ export default function Dashboard() {
                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
                           <span className="text-muted-foreground">{item.name}</span>
                         </div>
-                        <span className="font-medium text-foreground">{formatRevenue(item.value)}</span>
+                        <span className="font-medium text-foreground">{formatCurrencyExact(item.value)}</span>
                       </div>
                     ))}
                   </div>
@@ -348,7 +356,7 @@ export default function Dashboard() {
                       borderRadius: "8px",
                       color: "hsl(var(--foreground))",
                     }}
-                    formatter={(value: number) => [`₹${value.toLocaleString()}`, "Revenue"]}
+                    formatter={(value: number) => [formatCurrencyCompact(value), "Revenue"]}
                   />
                   <Bar dataKey="revenue" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                 </BarChart>
