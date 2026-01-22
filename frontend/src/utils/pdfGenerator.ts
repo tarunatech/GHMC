@@ -115,7 +115,7 @@ export const generateInvoicePDF = async (invoiceData: any) => {
 
   // Row 3
   doc.text('GST No.', col1 + 2, startY + 19);
-  doc.text(invoiceData.customerGst || '-', col2 + 2, startY + 19);
+  doc.text('24ABDFG3216E1ZZ', col2 + 2, startY + 19); // Always use company GST number
   doc.text('Vehical No.', col3 + 2, startY + 19);
   doc.text(invoiceData.vehicleNo || '-', col4 + 2, startY + 19);
   doc.line(10, startY + 21, 200, startY + 21);
