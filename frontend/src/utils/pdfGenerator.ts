@@ -155,11 +155,11 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   }
 
   // Box for Billed/Shipped
-  doc.rect(10, 61, 190, 35); // Outer box
-  doc.line(midX, 61, midX, 96); // Vertical separator
+  doc.rect(10, 61, 190, 45); // Increased height from 35 to 45
+  doc.line(midX, 61, midX, 106); // Extended vertical separator to 106 (61 + 45)
 
   // --- Item Table ---
-  const tableStartY = 96;
+  const tableStartY = 106;
 
   const tableHead = [['Sr. No.', 'Description of goods/service', 'HSN code', 'Qty.', 'Unit', 'Rate', 'Amount']];
 
