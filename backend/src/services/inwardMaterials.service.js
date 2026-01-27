@@ -1,6 +1,7 @@
 import prisma from '../config/database.js';
 import { NotFoundError, ValidationError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
+import { roundValue } from '../utils/math.js';
 
 /**
  * Inward Materials Service
@@ -159,21 +160,21 @@ class InwardMaterialsService {
       }
     }
 
-    // Parse numeric fields safely
-    const safeRate = (rate !== undefined && rate !== null && rate !== '') ? parseFloat(rate) : null;
-    const safeQuantity = (quantity !== undefined && quantity !== null && quantity !== '') ? parseFloat(quantity) : null;
-    let safeAmount = (amount !== undefined && amount !== null && amount !== '') ? parseFloat(amount) : null;
-    const safeDetCharges = (detCharges !== undefined && detCharges !== null && detCharges !== '') ? parseFloat(detCharges) : null;
-    const safeGst = (gst !== undefined && gst !== null && gst !== '') ? parseFloat(gst) : null;
-    let safeGrossAmount = (grossAmount !== undefined && grossAmount !== null && grossAmount !== '') ? parseFloat(grossAmount) : null;
+    // Parse numeric fields safely with rounding
+    const safeRate = roundValue(rate);
+    const safeQuantity = roundValue(quantity);
+    let safeAmount = roundValue(amount);
+    const safeDetCharges = roundValue(detCharges);
+    const safeGst = roundValue(gst);
+    let safeGrossAmount = roundValue(grossAmount);
 
     // Parse Vehicle Capacity safely for calculation
-    const safeVehicleCapacity = (vehicleCapacity !== undefined && vehicleCapacity !== null && vehicleCapacity !== '') ? parseFloat(vehicleCapacity) : null;
+    const safeVehicleCapacity = roundValue(vehicleCapacity);
 
     // Backend Failsafe: Calculate Amount if missing but Rate & Vehicle Capacity exist
     // Formula changed: Amount = Rate * Vehicle Capacity (was Quantity)
     if (safeAmount === null && safeRate !== null && safeVehicleCapacity !== null) {
-      safeAmount = parseFloat((safeRate * safeVehicleCapacity).toFixed(2));
+      safeAmount = roundValue(safeRate * safeVehicleCapacity);
       logger.info(`Backend auto-calculated Amount: ${safeAmount} from Rate: ${safeRate} * VehCap: ${safeVehicleCapacity}`);
     }
 
@@ -185,7 +186,7 @@ class InwardMaterialsService {
       const gstForGross = safeGst || 0;
       // Only calculate if at least one component is non-zero/valid, to avoid auto-filling 0 on completely empty records unless intended
       if (safeAmount !== null || safeDetCharges !== null || safeGst !== null) {
-        safeGrossAmount = parseFloat((baseForGross + detForGross + gstForGross).toFixed(2));
+        safeGrossAmount = roundValue(baseForGross + detForGross + gstForGross);
         logger.info(`Backend auto-calculated GrossAmount: ${safeGrossAmount}`);
       }
     }
@@ -206,7 +207,7 @@ class InwardMaterialsService {
       unit: unit?.trim() || null,
       transporterName: transporterName?.trim() || '',
       invoiceNo: invoiceNo?.trim() || null,
-      vehicleCapacity: vehicleCapacity?.trim() || null,
+      vehicleCapacity: safeVehicleCapacity !== null ? String(safeVehicleCapacity) : null,
       rate: safeRate,
       amount: safeAmount,
       detCharges: safeDetCharges,
@@ -239,24 +240,24 @@ class InwardMaterialsService {
    * @returns {Promise<object>} Updated material
    */
   async updateMaterial(materialId, updateData) {
-    // Prepare safe values
+    // Prepare safe values with rounding
     let safeRate = undefined;
-    if (updateData.rate !== undefined) safeRate = (updateData.rate !== null && updateData.rate !== '') ? parseFloat(updateData.rate) : null;
+    if (updateData.rate !== undefined) safeRate = roundValue(updateData.rate);
 
     let safeQuantity = undefined;
-    if (updateData.quantity !== undefined) safeQuantity = (updateData.quantity !== null && updateData.quantity !== '') ? parseFloat(updateData.quantity) : null;
+    if (updateData.quantity !== undefined) safeQuantity = roundValue(updateData.quantity);
 
     let safeAmount = undefined;
-    if (updateData.amount !== undefined) safeAmount = (updateData.amount !== null && updateData.amount !== '') ? parseFloat(updateData.amount) : null;
+    if (updateData.amount !== undefined) safeAmount = roundValue(updateData.amount);
 
     let safeDetCharges = undefined;
-    if (updateData.detCharges !== undefined) safeDetCharges = (updateData.detCharges !== null && updateData.detCharges !== '') ? parseFloat(updateData.detCharges) : null;
+    if (updateData.detCharges !== undefined) safeDetCharges = roundValue(updateData.detCharges);
 
     let safeGst = undefined;
-    if (updateData.gst !== undefined) safeGst = (updateData.gst !== null && updateData.gst !== '') ? parseFloat(updateData.gst) : null;
+    if (updateData.gst !== undefined) safeGst = roundValue(updateData.gst);
 
     let safeGrossAmount = undefined;
-    if (updateData.grossAmount !== undefined) safeGrossAmount = (updateData.grossAmount !== null && updateData.grossAmount !== '') ? parseFloat(updateData.grossAmount) : null;
+    if (updateData.grossAmount !== undefined) safeGrossAmount = roundValue(updateData.grossAmount);
 
     // Failsafe Logic for Updates:
     // If we are updating Rate or Quantity, but NOT Amount, we should recalculate Amount based on new/existing values.
@@ -266,7 +267,7 @@ class InwardMaterialsService {
     const existingMaterial = await this.getMaterialById(materialId);
 
     const finalRate = safeRate !== undefined ? safeRate : Number(existingMaterial.rate);
-    const finalVehicleCapacity = (updateData.vehicleCapacity !== undefined) ? (updateData.vehicleCapacity ? parseFloat(updateData.vehicleCapacity) : 0) : Number(existingMaterial.vehicleCapacity || 0);
+    const finalVehicleCapacity = (updateData.vehicleCapacity !== undefined) ? roundValue(updateData.vehicleCapacity) : Number(existingMaterial.vehicleCapacity || 0);
 
     // Auto-calc Amount if:
     // 1. Amount is MISSING in update (undefined) - use calc
@@ -279,7 +280,7 @@ class InwardMaterialsService {
       const shouldRecalc = safeAmount === null || safeRate !== undefined || updateData.vehicleCapacity !== undefined;
 
       if (shouldRecalc) {
-        safeAmount = parseFloat((finalRate * finalVehicleCapacity).toFixed(2));
+        safeAmount = roundValue(finalRate * finalVehicleCapacity);
         logger.info(`Backend UPDATE auto-calculated Amount: ${safeAmount} from Rate: ${finalRate} * VehCap: ${finalVehicleCapacity}`);
       }
     }
@@ -295,7 +296,7 @@ class InwardMaterialsService {
       const shouldRecalcGross = safeGrossAmount === null || safeAmount !== undefined || safeDetCharges !== undefined || safeGst !== undefined;
 
       if (shouldRecalcGross) {
-        safeGrossAmount = parseFloat(((finalAmount || 0) + finalDet + finalGst).toFixed(2));
+        safeGrossAmount = roundValue((finalAmount || 0) + finalDet + finalGst);
         logger.info(`Backend UPDATE auto-calculated Gross: ${safeGrossAmount}`);
       }
     }
@@ -313,7 +314,10 @@ class InwardMaterialsService {
     if (updateData.unit !== undefined) updateMap.unit = updateData.unit?.trim() || null;
     if (updateData.transporterName !== undefined) updateMap.transporterName = updateData.transporterName?.trim() || '';
     if (updateData.invoiceNo !== undefined) updateMap.invoiceNo = updateData.invoiceNo?.trim() || null;
-    if (updateData.vehicleCapacity !== undefined) updateMap.vehicleCapacity = updateData.vehicleCapacity?.trim() || null;
+    if (updateData.vehicleCapacity !== undefined) {
+      const rounded = roundValue(updateData.vehicleCapacity);
+      updateMap.vehicleCapacity = rounded !== null ? String(rounded) : null;
+    }
 
     if (safeRate !== undefined) updateMap.rate = safeRate;
     if (safeAmount !== undefined) updateMap.amount = safeAmount;

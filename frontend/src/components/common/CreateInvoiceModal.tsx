@@ -21,6 +21,23 @@ interface Props {
   onSuccess?: () => void;
 }
 
+// Helper function to normalize unit values (Kg -> KG for consistency)
+const normalizeUnit = (unit: string | undefined | null): string => {
+  if (!unit) return 'MT';
+  const upper = unit.toUpperCase();
+  if (upper === 'KG' || upper === 'KGS') return 'KG';
+  if (upper === 'MT' || upper === 'MTS') return 'MT';
+  if (upper === 'KL' || upper === 'KLS') return 'KL';
+  return unit; // Return as-is for other units like 'Nos'
+};
+
+// Helper function to check if units are compatible for conversion
+const areUnitsCompatible = (unit1: string, unit2: string): boolean => {
+  const u1 = normalizeUnit(unit1);
+  const u2 = normalizeUnit(unit2);
+  return (u1 === 'MT' && u2 === 'KG') || (u1 === 'KG' && u2 === 'MT');
+};
+
 export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedEntryIds = [], onSuccess }: Props) {
   const queryClient = useQueryClient();
   const [formData, setFormData] = useState({
@@ -36,6 +53,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
       amount?: number;
       manifestNo?: string;
       description: string;
+      baseUnit?: string;
     }>,
     manifestNos: [] as string[],
     inwardEntryIds: preselectedEntryIds,
@@ -47,17 +65,23 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
     billedTo: '',
     shippedTo: '',
     description: '',
-    additionalCharges: 0,
-    additionalChargesDescription: '',
-    additionalChargesQuantity: 0,
-    additionalChargesRate: 0,
-    additionalChargesUnit: '',
+    additionalChargesList: [] as Array<{
+      description: string;
+      quantity: number;
+      rate: number;
+      amount: number;
+      unit: string;
+    }>,
     applyGst: true,
+    poNo: '',
+    poDate: '',
+    vehicleNo: '',
   });
 
 
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasPopulatedInitialData, setHasPopulatedInitialData] = useState(false);
 
   // Append mode state
   const [existingInvoices, setExistingInvoices] = useState<Invoice[]>([]);
@@ -143,22 +167,12 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
     };
   }, [formData.companyId, type]);
 
-  // Auto-calculate Additional Charges Amount
-  useEffect(() => {
-    const qty = formData.additionalChargesQuantity || 0;
-    const rate = formData.additionalChargesRate || 0;
-    if (qty > 0 || rate > 0) {
-      setFormData(prev => ({
-        ...prev,
-        additionalCharges: Number((qty * rate).toFixed(2))
-      }));
-    }
-  }, [formData.additionalChargesQuantity, formData.additionalChargesRate]);
+  // Auto-calculate Additional Charges (No longer needed globally for sync as we calculate per row)
 
 
   // Auto-populate preselected entries
   useEffect(() => {
-    if (preselectedEntryIds.length > 0 && inwardEntriesData) {
+    if (preselectedEntryIds.length > 0 && inwardEntriesData && !hasPopulatedInitialData) {
       const entries = inwardEntriesData.entries.filter(e => preselectedEntryIds.includes(e.id));
       if (entries.length > 0) {
         const firstEntry = entries[0];
@@ -171,10 +185,25 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
           shippedTo: firstEntry.company?.address || prev.shippedTo,
           manifestNos: entries.map(e => e.manifestNo).filter(Boolean),
           inwardEntryIds: preselectedEntryIds,
+          materials: entries.map(entry => {
+            const normalizedUnit = normalizeUnit(entry.unit);
+            return {
+              materialName: entry.wasteName,
+              rate: entry.rate ? Number(entry.rate) : 0,
+              unit: normalizedUnit,
+              baseUnit: normalizedUnit, // Very important: keep track of what unit the rate is for
+              quantity: Number(entry.quantity),
+              amount: Number((Number(entry.quantity) * (entry.rate ? Number(entry.rate) : 0)).toFixed(2)),
+              manifestNo: entry.manifestNo,
+              description: '',
+            };
+          }),
+          vehicleNo: firstEntry.vehicleNo || prev.vehicleNo,
         }));
+        setHasPopulatedInitialData(true);
       }
     }
-  }, [preselectedEntryIds, inwardEntriesData]);
+  }, [preselectedEntryIds, inwardEntriesData, hasPopulatedInitialData]);
 
   // Auto-populate GST rates from settings
   useEffect(() => {
@@ -193,12 +222,12 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
 
   // Calculate totals for display and effects
   const subtotal = formData.materials.reduce((sum, m) => sum + (m.amount || 0), 0) || formData.subtotal;
-  const additionalCharges = parseFloat(String(formData.additionalCharges || 0));
-  const baseForTax = subtotal + additionalCharges;
+  const additionalChargesSum = formData.additionalChargesList.reduce((sum, c) => sum + (c.amount || 0), 0);
+  const baseForTax = subtotal + additionalChargesSum;
   const cgstRateValue = formData.applyGst ? (formData.cgstRate !== undefined ? formData.cgstRate : 9) : 0;
   const sgstRateValue = formData.applyGst ? (formData.sgstRate !== undefined ? formData.sgstRate : 9) : 0;
-  const cgst = (baseForTax * cgstRateValue) / 100;
-  const sgst = (baseForTax * sgstRateValue) / 100;
+  const cgst = Math.round((baseForTax * cgstRateValue) / 100);
+  const sgst = Math.round((baseForTax * sgstRateValue) / 100);
   const grandTotal = baseForTax + cgst + sgst;
 
 
@@ -223,15 +252,19 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
       console.log('DEBUG: Fetched fullInvoice for Append:', fullInvoice);
 
       // Parse existing materials
-      const existingMaterials = fullInvoice.invoiceMaterials?.map(m => ({
-        materialName: m.materialName,
-        rate: m.rate ? Number(m.rate) : 0,
-        unit: m.unit || '',
-        quantity: m.quantity ? Number(m.quantity) : 0,
-        amount: m.amount ? Number(m.amount) : 0,
-        manifestNo: m.manifestNo || '',
-        description: m.description || '',
-      })) || [];
+      const existingMaterials = fullInvoice.invoiceMaterials?.map(m => {
+        const normalizedUnit = normalizeUnit(m.unit);
+        return {
+          materialName: m.materialName,
+          rate: m.rate ? Number(m.rate) : 0,
+          unit: normalizedUnit,
+          quantity: m.quantity ? Number(m.quantity) : 0,
+          amount: m.amount ? Number(m.amount) : 0,
+          manifestNo: m.manifestNo || '',
+          description: m.description || '',
+          baseUnit: normalizedUnit, // Existing saved unit becomes the base for further edits
+        };
+      }) || [];
 
       const existingManifests = fullInvoice.invoiceManifests?.map(m => m.manifestNo) || [];
       const existingEntryIds = fullInvoice.inwardEntries?.map(e => e.id) || [];
@@ -256,6 +289,10 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
         additionalChargesQuantity: fullInvoice.additionalChargesQuantity ? Number(fullInvoice.additionalChargesQuantity) : 0,
         additionalChargesRate: fullInvoice.additionalChargesRate ? Number(fullInvoice.additionalChargesRate) : 0,
         additionalChargesUnit: fullInvoice.additionalChargesUnit || '',
+        additionalChargesList: [], // For now, mapping from single to list if needed, or just let it be
+        poNo: fullInvoice.poNo || '',
+        poDate: fullInvoice.poDate ? fullInvoice.poDate.slice(0, 10) : '',
+        vehicleNo: fullInvoice.vehicleNo || '',
       }));
 
 
@@ -307,12 +344,12 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
           billedTo: formData.billedTo,
           shippedTo: formData.shippedTo,
           description: formData.description,
-          additionalCharges: formData.additionalCharges,
-          additionalChargesDescription: formData.additionalChargesDescription,
-          additionalChargesQuantity: formData.additionalChargesQuantity,
-          additionalChargesRate: formData.additionalChargesRate,
-          additionalChargesUnit: formData.additionalChargesUnit,
+          additionalCharges: additionalChargesSum,
+          additionalChargesList: formData.additionalChargesList,
           inwardEntryIds: formData.inwardEntryIds,
+          poNo: formData.poNo,
+          poDate: formData.poDate,
+          vehicleNo: formData.vehicleNo,
         };
         console.log('DEBUG: Updating Invoice with payload:', updatePayload);
         await invoicesService.updateInvoice(existingInvoice.id, updatePayload);
@@ -335,13 +372,13 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
           billedTo: formData.billedTo || undefined,
           shippedTo: formData.shippedTo || undefined,
           description: formData.description || undefined,
-          additionalCharges: formData.additionalCharges || 0,
-          additionalChargesDescription: formData.additionalChargesDescription || undefined,
-          additionalChargesQuantity: formData.additionalChargesQuantity || 0,
-          additionalChargesRate: formData.additionalChargesRate || 0,
-          additionalChargesUnit: formData.additionalChargesUnit || undefined,
+          additionalCharges: additionalChargesSum,
+          additionalChargesList: formData.additionalChargesList,
           paymentReceived: 0,
           paymentReceivedOn: undefined,
+          poNo: formData.poNo,
+          poDate: formData.poDate,
+          vehicleNo: formData.vehicleNo,
         };
 
         console.log('DEBUG: Creating Invoice with data:', invoiceData);
@@ -368,12 +405,11 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
         billedTo: '',
         shippedTo: '',
         description: '',
-        additionalCharges: 0,
-        additionalChargesDescription: '',
-        additionalChargesQuantity: 0,
-        additionalChargesRate: 0,
-        additionalChargesUnit: '',
+        additionalChargesList: [],
         applyGst: true,
+        poNo: '',
+        poDate: '',
+        vehicleNo: '',
       });
       setIsAppendMode(false);
       setExistingInvoice(null);
@@ -397,16 +433,58 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
   const updateMaterial = (index: number, field: string, value: any) => {
     setFormData(prev => {
       const updated = [...prev.materials];
+      const material = updated[index];
+      const oldUnit = material.unit || '';
+      const oldQty = material.quantity || 0;
+
+      // Update the specific field
       updated[index] = { ...updated[index], [field]: value };
 
-      // Auto-calculate amount if quantity or rate changes
-      if (field === 'quantity' || field === 'rate') {
-        const qty = field === 'quantity' ? value : updated[index].quantity || 0;
-        const rate = field === 'rate' ? value : updated[index].rate || 0;
-        updated[index].amount = qty * rate;
+      // Handle automatic quantity conversion when unit changes (MT <-> KG only)
+      if (field === 'unit') {
+        if (oldUnit === 'MT' && value === 'KG') {
+          updated[index].quantity = oldQty * 1000;
+        } else if (oldUnit === 'KG' && value === 'MT') {
+          updated[index].quantity = oldQty / 1000;
+        }
+      }
+
+      // SIMPLE CALCULATION: Amount = Quantity * Rate (no unit conversion)
+      if (field === 'quantity' || field === 'rate' || field === 'unit') {
+        const qty = updated[index].quantity || 0;
+        const rate = updated[index].rate || 0;
+        updated[index].amount = Number((qty * rate).toFixed(2));
       }
 
       return { ...prev, materials: updated };
+    });
+  };
+
+  const addAdditionalCharge = () => {
+    setFormData(prev => ({
+      ...prev,
+      additionalChargesList: [
+        ...prev.additionalChargesList,
+        { description: '', quantity: 1, rate: 0, amount: 0, unit: 'MT' }
+      ]
+    }));
+  };
+
+  const removeAdditionalCharge = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      additionalChargesList: prev.additionalChargesList.filter((_, i) => i !== index)
+    }));
+  };
+
+  const updateAdditionalCharge = (index: number, field: string, value: any) => {
+    setFormData(prev => {
+      const updated = [...prev.additionalChargesList];
+      updated[index] = { ...updated[index], [field]: value };
+      if (field === 'quantity' || field === 'rate') {
+        updated[index].amount = Number(((updated[index].quantity || 0) * (updated[index].rate || 0)).toFixed(2));
+      }
+      return { ...prev, additionalChargesList: updated };
     });
   };
 
@@ -446,8 +524,8 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
                         <span>{inv.invoiceManifests?.length || 0} Entries</span>
                         <span>•</span>
                         <span className={`px-1.5 py-0.5 rounded-full text-[10px] uppercase font-medium border ${inv.status === 'paid' ? 'bg-green-100 text-green-700 border-green-200' :
-                            inv.status === 'partial' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                              'bg-amber-100 text-amber-700 border-amber-200'
+                          inv.status === 'partial' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                            'bg-amber-100 text-amber-700 border-amber-200'
                           }`}>
                           {inv.status}
                         </span>
@@ -523,6 +601,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
                 value={formData.companyId}
                 onChange={(e) => {
                   const company = companies.find(c => c.id === e.target.value);
+                  setHasPopulatedInitialData(false); // Reset to allow re-populating for new company if needed
                   setFormData({
                     ...formData,
                     companyId: e.target.value,
@@ -534,6 +613,9 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
                     materials: [],
                     manifestNos: [],
                     subtotal: 0,
+                    poNo: '',
+                    poDate: '',
+                    vehicleNo: '',
                   });
                 }}
                 required
@@ -583,6 +665,40 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
               onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
             />
           </div>
+
+          {type === 'Inward' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">PO. No.</label>
+                <input
+                  type="text"
+                  className="input-field w-full"
+                  value={formData.poNo}
+                  onChange={(e) => setFormData({ ...formData, poNo: e.target.value })}
+                  placeholder="Purchase Order Number"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">PO. Date</label>
+                <input
+                  type="date"
+                  className="input-field w-full"
+                  value={formData.poDate}
+                  onChange={(e) => setFormData({ ...formData, poDate: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">Vehicle No.</label>
+                <input
+                  type="text"
+                  className="input-field w-full"
+                  value={formData.vehicleNo}
+                  onChange={(e) => setFormData({ ...formData, vehicleNo: e.target.value })}
+                  placeholder="e.g. MH12AB1234"
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Link Entries Section - Moved up for better flow */}
@@ -614,10 +730,12 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
                           if (checked) {
                             newEntryIds.push(entry.id);
                             // Add material from entry
+                            const normalizedUnit = normalizeUnit(entry.unit);
                             newMaterials.push({
                               materialName: entry.wasteName,
                               rate: entry.rate ? Number(entry.rate) : 0,
-                              unit: entry.unit,
+                              unit: normalizedUnit,
+                              baseUnit: normalizedUnit, // Store normalized unit as baseUnit
                               quantity: Number(entry.quantity),
                               amount: (Number(entry.quantity) * (entry.rate ? Number(entry.rate) : 0)),
                               manifestNo: entry.manifestNo,
@@ -684,29 +802,40 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
             <div className="space-y-2 max-h-[200px] overflow-y-auto pr-1">
               {formData.materials.map((material, index) => (
                 <div key={index} className="relative grid grid-cols-12 gap-x-2 gap-y-1 p-2 bg-secondary/50 rounded-lg items-center text-sm">
-                  <div className="col-span-3">
+                  <div className="col-span-4">
                     <div className="font-medium truncate" title={material.materialName}>{material.materialName}</div>
                   </div>
                   <div className="col-span-2">
                     <input
                       type="number"
                       step="0.01"
-                      className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                      className="h-8 w-full rounded border border-input bg-background/50 px-2 text-xs text-right"
                       value={material.quantity || ''}
                       onChange={(e) => updateMaterial(index, 'quantity', parseFloat(e.target.value) || 0)}
+                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
                       placeholder="Qty"
                     />
                   </div>
-                  <div className="col-span-1 text-xs text-muted-foreground">
-                    {material.unit}
+                  <div className="col-span-1">
+                    <select
+                      className="h-8 w-full rounded border border-input bg-background px-1 text-xs"
+                      value={normalizeUnit(material.unit)}
+                      onChange={(e) => updateMaterial(index, 'unit', e.target.value)}
+                    >
+                      <option value="MT">MT</option>
+                      <option value="KG">KG</option>
+                      <option value="KL">KL</option>
+                      <option value="Nos">Nos</option>
+                    </select>
                   </div>
                   <div className="col-span-2">
                     <input
                       type="number"
                       step="0.01"
-                      className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                      className="h-8 w-full rounded border border-input bg-background/50 px-2 text-xs text-right"
                       value={material.rate || ''}
                       onChange={(e) => updateMaterial(index, 'rate', parseFloat(e.target.value) || 0)}
+                      onWheel={(e) => (e.target as HTMLInputElement).blur()}
                       placeholder="Rate"
                     />
                   </div>
@@ -773,6 +902,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
               className="input-field w-full"
               value={formData.subtotal || ''}
               onChange={(e) => setFormData({ ...formData, subtotal: parseFloat(e.target.value) || 0 })}
+              onWheel={(e) => (e.target as HTMLInputElement).blur()}
               required={formData.materials.length === 0}
             />
           </div>
@@ -823,14 +953,14 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
               <span className="text-muted-foreground">Subtotal</span>
               <span className="font-medium">₹{subtotal.toFixed(2)}</span>
             </div>
-            {additionalCharges > 0 && (
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground truncate max-w-[100px]" title={formData.additionalChargesDescription}>
-                  {formData.additionalChargesDescription || 'Addl. Charges'}
+            {formData.additionalChargesList.map((charge, idx) => (
+              <div key={idx} className="flex justify-between items-center">
+                <span className="text-muted-foreground truncate max-w-[100px]" title={charge.description}>
+                  {charge.description || 'Addl. Charge'}
                 </span>
-                <span className="font-medium">₹{additionalCharges.toFixed(2)}</span>
+                <span className="font-medium">₹{Number(charge.amount || 0).toFixed(2)}</span>
               </div>
-            )}
+            ))}
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="text-[10px] text-muted-foreground block">CGST %</label>
@@ -838,6 +968,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
                   type="number"
                   className="h-7 w-full rounded border border-input px-1 text-right text-xs bg-muted"
                   value={formData.applyGst ? String(formData.cgstRate || 9) : "0"}
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
                   readOnly
                   disabled
                 />
@@ -853,6 +984,7 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
                   type="number"
                   className="h-7 w-full rounded border border-input px-1 text-right text-xs bg-muted"
                   value={formData.applyGst ? String(formData.sgstRate || 9) : "0"}
+                  onWheel={(e) => (e.target as HTMLInputElement).blur()}
                   readOnly
                   disabled
                 />
@@ -881,64 +1013,88 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
           </div>
 
           {/* Additional Charges Section (Right) */}
-          <div className="col-span-12 md:col-span-9 grid grid-cols-1 md:grid-cols-4 gap-4 border rounded-lg p-4 bg-muted/20 h-fit">
-            <div className="md:col-span-4">
-              <label className="block text-sm font-medium text-foreground mb-2">Additional Charges</label>
+          <div className="col-span-12 md:col-span-9 border rounded-lg p-4 bg-muted/20 h-fit space-y-4">
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-foreground">Additional Charges</label>
+              <Button type="button" size="sm" variant="outline" onClick={addAdditionalCharge}>
+                + Add Charge
+              </Button>
             </div>
-            <div className="md:col-span-4">
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Description</label>
-              <input
-                type="text"
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                placeholder="e.g. Transportation, Handling..."
-                value={formData.additionalChargesDescription}
-                onChange={(e) => setFormData({ ...formData, additionalChargesDescription: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Qty</label>
-              <input
-                type="number"
-                step="0.01"
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                placeholder="0"
-                value={formData.additionalChargesQuantity || ''}
-                onChange={(e) => setFormData({ ...formData, additionalChargesQuantity: parseFloat(e.target.value) || 0 })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Unit</label>
-              <input
-                type="text"
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                placeholder="e.g. Nos"
-                value={formData.additionalChargesUnit || ''}
-                onChange={(e) => setFormData({ ...formData, additionalChargesUnit: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Rate</label>
-              <input
-                type="number"
-                step="0.01"
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                placeholder="0.00"
-                value={formData.additionalChargesRate || ''}
-                onChange={(e) => setFormData({ ...formData, additionalChargesRate: parseFloat(e.target.value) || 0 })}
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">Amount</label>
-              <input
-                type="number"
-                step="0.01"
-                className="h-10 w-full rounded-md border border-input bg-muted px-3 text-sm font-semibold"
-                placeholder="0.00"
-                value={formData.additionalCharges || ''}
-                readOnly
-                disabled
-              />
-            </div>
+
+            {formData.additionalChargesList.length > 0 ? (
+              <div className="space-y-3">
+                {formData.additionalChargesList.map((charge, index) => (
+                  <div key={index} className="grid grid-cols-12 gap-2 p-3 bg-background rounded-md border items-end">
+                    <div className="col-span-12 md:col-span-3">
+                      <label className="block text-[10px] uppercase font-bold text-muted-foreground mb-1">Description</label>
+                      <input
+                        type="text"
+                        className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                        placeholder="e.g. Transportation"
+                        value={charge.description}
+                        onChange={(e) => updateAdditionalCharge(index, 'description', e.target.value)}
+                      />
+                    </div>
+                    <div className="col-span-3 md:col-span-2">
+                      <label className="block text-[10px] uppercase font-bold text-muted-foreground mb-1">Qty</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                        value={charge.quantity || ''}
+                        onChange={(e) => updateAdditionalCharge(index, 'quantity', parseFloat(e.target.value) || 0)}
+                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                      />
+                    </div>
+                    <div className="col-span-3 md:col-span-2">
+                      <label className="block text-[10px] uppercase font-bold text-muted-foreground mb-1">Unit</label>
+                      <select
+                        className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                        value={charge.unit}
+                        onChange={(e) => updateAdditionalCharge(index, 'unit', e.target.value)}
+                      >
+                        <option value="MT">MT</option>
+                        <option value="KG">KG</option>
+                        <option value="KL">KL</option>
+                        <option value="Nos">Nos</option>
+                      </select>
+                    </div>
+                    <div className="col-span-3 md:col-span-2">
+                      <label className="block text-[10px] uppercase font-bold text-muted-foreground mb-1">Rate</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        className="h-8 w-full rounded-md border border-input bg-background px-2 text-xs"
+                        value={charge.rate || ''}
+                        onChange={(e) => updateAdditionalCharge(index, 'rate', parseFloat(e.target.value) || 0)}
+                        onWheel={(e) => (e.target as HTMLInputElement).blur()}
+                      />
+                    </div>
+                    <div className="col-span-3">
+                      <label className="block text-[10px] uppercase font-bold text-muted-foreground mb-1">Amount</label>
+                      <div className="h-8 flex items-center justify-between px-2 bg-muted/30 rounded border border-transparent text-xs font-semibold">
+                        <span>₹{Number(charge.amount || 0).toFixed(2)}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeAdditionalCharge(index)}
+                          className="text-destructive hover:text-destructive/80 transition-colors ml-1"
+                          title="Remove Charge"
+                        >
+                          <span className="text-lg">&times;</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-6 border-2 border-dashed rounded-lg bg-muted/10">
+                <p className="text-sm text-muted-foreground mb-2">No additional charges added</p>
+                <Button type="button" size="sm" variant="ghost" onClick={addAdditionalCharge}>
+                  Add first charge
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 

@@ -7,6 +7,7 @@ import authService from "@/services/auth.service";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { getErrorMessage, logError } from "@/utils/errorHandler";
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -65,7 +66,8 @@ export default function Settings() {
       toast.success('Settings updated successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to update settings');
+      logError('Updating settings', error);
+      toast.error(getErrorMessage(error, 'Failed to update settings'));
     },
   });
 
@@ -77,7 +79,8 @@ export default function Settings() {
       toast.success('Profile updated successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to update profile');
+      logError('Updating profile', error);
+      toast.error(getErrorMessage(error, 'Failed to update profile'));
     },
   });
 
@@ -89,7 +92,8 @@ export default function Settings() {
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to change password');
+      logError('Changing password', error);
+      toast.error(getErrorMessage(error, 'Failed to change password'));
     },
   });
 

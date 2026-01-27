@@ -14,6 +14,12 @@ const router = express.Router();
 // Get all outward entries
 router.get('/', authenticate, outwardController.getAllEntries.bind(outwardController));
 
+// Get consolidated summary
+router.get('/summary/all', authenticate, outwardController.getSummary.bind(outwardController));
+
+// Get statistics
+router.get('/stats/all', authenticate, outwardController.getStats.bind(outwardController));
+
 // Get outward entry by ID
 router.get('/:id', authenticate, outwardController.getEntryById.bind(outwardController));
 
@@ -21,7 +27,7 @@ router.get('/:id', authenticate, outwardController.getEntryById.bind(outwardCont
 router.post(
   '/',
   authenticate,
-  authorize(['superadmin', 'employee']),
+  authorize(['superadmin', 'admin', 'employee']),
   validate(createOutwardEntrySchema),
   outwardController.createEntry.bind(outwardController)
 );
@@ -30,19 +36,13 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize(['superadmin', 'employee']),
+  authorize(['superadmin', 'admin', 'employee']),
   validate(updateOutwardEntrySchema),
   outwardController.updateEntry.bind(outwardController)
 );
 
 // Delete outward entry
-router.delete('/:id', authenticate, authorize(['superadmin', 'employee']), outwardController.deleteEntry.bind(outwardController));
-
-// Get consolidated summary
-router.get('/summary/all', authenticate, outwardController.getSummary.bind(outwardController));
-
-// Get statistics
-router.get('/stats/all', authenticate, outwardController.getStats.bind(outwardController));
+router.delete('/:id', authenticate, authorize(['superadmin', 'admin', 'employee']), outwardController.deleteEntry.bind(outwardController));
 
 // Note: /summary/all and /stats/all are used to avoid conflict with /:id route
 

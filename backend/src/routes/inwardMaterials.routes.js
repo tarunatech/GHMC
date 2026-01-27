@@ -21,7 +21,7 @@ router.get('/:id', authenticate, inwardMaterialsController.getMaterialById.bind(
 router.post(
   '/',
   authenticate,
-  authorize(['superadmin', 'employee']),
+  authorize(['superadmin', 'admin', 'employee']),
   validate(createInwardMaterialSchema),
   inwardMaterialsController.createMaterial.bind(inwardMaterialsController)
 );
@@ -30,13 +30,13 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize(['superadmin', 'employee']),
+  authorize(['superadmin', 'admin', 'employee']),
   validate(updateInwardMaterialSchema),
   inwardMaterialsController.updateMaterial.bind(inwardMaterialsController)
 );
 
 // Delete inward material
-router.delete('/:id', authenticate, authorize(['superadmin', 'employee']), inwardMaterialsController.deleteMaterial.bind(inwardMaterialsController));
+router.delete('/:id', authenticate, authorize(['superadmin', 'admin', 'employee']), inwardMaterialsController.deleteMaterial.bind(inwardMaterialsController));
 
 export default router;
 

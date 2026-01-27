@@ -209,6 +209,9 @@ model Invoice {
   billedTo                     String?           @map("billed_to")
   shippedTo                    String?           @map("shipped_to")
   description                  String?
+  poNo                         String?           @map("po_no")
+  poDate                       DateTime?         @map("po_date") @db.Date
+  vehicleNo                    String?           @map("vehicle_no")
   createdAt                    DateTime          @default(now()) @map("created_at")
   updatedAt                    DateTime          @updatedAt @map("updated_at")
   additionalCharges            Decimal?          @default(0) @map("additional_charges") @db.Decimal(10, 2)
@@ -242,17 +245,18 @@ model InvoiceManifest {
 }
 
 model InvoiceMaterial {
-  id           String   @id @default(uuid())
-  invoiceId    String   @map("invoice_id")
-  materialName String   @map("material_name")
-  rate         Decimal? @db.Decimal(10, 2)
-  unit         String?
-  quantity     Decimal? @db.Decimal(10, 2)
-  amount       Decimal? @db.Decimal(10, 2)
-  manifestNo   String?  @map("manifest_no")
-  createdAt    DateTime @default(now()) @map("created_at")
-  description  String?
-  invoice      Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  id                 String   @id @default(uuid())
+  invoiceId          String   @map("invoice_id")
+  materialName       String   @map("material_name")
+  rate               Decimal? @db.Decimal(10, 2)
+  unit               String?
+  quantity           Decimal? @db.Decimal(10, 2)
+  amount             Decimal? @db.Decimal(10, 2)
+  manifestNo         String?  @map("manifest_no")
+  createdAt          DateTime @default(now()) @map("created_at")
+  description        String?
+  isAdditionalCharge Boolean  @default(false) @map("is_additional_charge")
+  invoice            Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@map("invoice_materials")
 }

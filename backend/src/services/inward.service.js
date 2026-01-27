@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { NotFoundError, ValidationError } from '../utils/errors.js';
+import { roundValue } from '../utils/math.js';
 
 /**
  * Inward Entries Service
@@ -284,9 +285,9 @@ class InwardService {
           manifestNo: manifestNo.trim(),
           vehicleNo: vehicleNo?.trim() || null,
           wasteName: wasteName.trim(),
-          rate: finalRate ? parseFloat(finalRate) : null,
+          rate: roundValue(finalRate),
           category: category?.trim() || null,
-          quantity: parseFloat(quantity),
+          quantity: roundValue(quantity),
           unit: unit.trim(),
           month: month?.trim() || null,
           remarks: remarks?.trim() || null,
@@ -336,9 +337,9 @@ class InwardService {
         ...(updateData.manifestNo !== undefined && { manifestNo: updateData.manifestNo.trim() }),
         ...(updateData.vehicleNo !== undefined && { vehicleNo: updateData.vehicleNo?.trim() || null }),
         ...(updateData.wasteName !== undefined && { wasteName: updateData.wasteName.trim() }),
-        ...(updateData.rate !== undefined && { rate: updateData.rate ? parseFloat(updateData.rate) : null }),
+        ...(updateData.rate !== undefined && { rate: roundValue(updateData.rate) }),
         ...(updateData.category !== undefined && { category: updateData.category?.trim() || null }),
-        ...(updateData.quantity !== undefined && { quantity: parseFloat(updateData.quantity) }),
+        ...(updateData.quantity !== undefined && { quantity: roundValue(updateData.quantity) }),
         ...(updateData.unit !== undefined && { unit: updateData.unit.trim() }),
         ...(updateData.month !== undefined && { month: updateData.month?.trim() || null }),
         ...(updateData.lotNo !== undefined && { lotNo: updateData.lotNo?.trim() || null }),

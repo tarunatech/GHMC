@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import authService, { User, LoginCredentials } from '@/services/auth.service';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { getErrorMessage, logError } from '@/utils/errorHandler';
 
 interface AuthContextType {
   user: User | null;
@@ -66,8 +67,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         navigate('/companies');
       }
     } catch (error: any) {
-      const message = error.response?.data?.error?.message || 'Login failed';
-      toast.error(message);
+      logError('Login', error);
+      toast.error(getErrorMessage(error, 'Login failed'));
       throw error;
     }
   };

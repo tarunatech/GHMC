@@ -1,5 +1,6 @@
 import prisma from '../config/database.js';
 import { NotFoundError, ValidationError } from '../utils/errors.js';
+import { roundValue } from '../utils/math.js';
 import invoicesService from './invoices.service.js';
 
 /**
@@ -246,15 +247,15 @@ class OutwardService {
         transporterId: transporterId || null,
         vehicleNo: vehicleNo?.trim() || null,
         wasteName: wasteName?.trim() || null,
-        quantity: parseFloat(quantity),
+        quantity: roundValue(quantity),
         unit: unit.trim(),
         packing: packing?.trim() || null,
-        rate: rate ? parseFloat(rate) : null,
-        amount: calculatedAmount ? parseFloat(calculatedAmount) : null,
-        gst: gst ? parseFloat(gst) : null,
-        grossAmount: calculatedGrossAmount ? parseFloat(calculatedGrossAmount) : null,
-        vehicleCapacity: vehicleCapacity?.trim() || null,
-        detCharges: detCharges ? parseFloat(detCharges) : null,
+        rate: roundValue(rate),
+        amount: roundValue(calculatedAmount),
+        gst: roundValue(gst),
+        grossAmount: roundValue(calculatedGrossAmount),
+        vehicleCapacity: vehicleCapacity ? String(roundValue(vehicleCapacity) || vehicleCapacity).trim() : null,
+        detCharges: roundValue(detCharges),
         paidOn: paidOn ? new Date(paidOn) : null,
         dueOn: dueOn ? new Date(dueOn) : null,
         invoiceId: resolvedInvoiceId,
@@ -325,18 +326,18 @@ class OutwardService {
         ...(updateData.transporterId !== undefined && { transporterId: updateData.transporterId || null }),
         ...(updateData.vehicleNo !== undefined && { vehicleNo: updateData.vehicleNo?.trim() || null }),
         ...(updateData.wasteName !== undefined && { wasteName: updateData.wasteName?.trim() || null }),
-        ...(updateData.quantity !== undefined && { quantity: parseFloat(updateData.quantity) }),
+        ...(updateData.quantity !== undefined && { quantity: roundValue(updateData.quantity) }),
         ...(updateData.unit !== undefined && { unit: updateData.unit.trim() }),
         ...(updateData.packing !== undefined && { packing: updateData.packing?.trim() || null }),
         ...(updateData.month !== undefined && { month: updateData.month?.trim() || null }),
-        ...(updateData.rate !== undefined && { rate: updateData.rate ? parseFloat(updateData.rate) : null }),
-        ...(updateData.gst !== undefined && { gst: updateData.gst ? parseFloat(updateData.gst) : null }),
-        ...(updateData.vehicleCapacity !== undefined && { vehicleCapacity: updateData.vehicleCapacity?.trim() || null }),
-        ...(updateData.detCharges !== undefined && { detCharges: updateData.detCharges ? parseFloat(updateData.detCharges) : null }),
+        ...(updateData.rate !== undefined && { rate: roundValue(updateData.rate) }),
+        ...(updateData.gst !== undefined && { gst: roundValue(updateData.gst) }),
+        ...(updateData.vehicleCapacity !== undefined && { vehicleCapacity: updateData.vehicleCapacity ? String(roundValue(updateData.vehicleCapacity) || updateData.vehicleCapacity).trim() : null }),
+        ...(updateData.detCharges !== undefined && { detCharges: roundValue(updateData.detCharges) }),
         ...(updateData.paidOn !== undefined && { paidOn: updateData.paidOn ? new Date(updateData.paidOn) : null }),
         ...(updateData.dueOn !== undefined && { dueOn: updateData.dueOn ? new Date(updateData.dueOn) : null }),
-        ...(amount !== undefined && { amount: amount ? parseFloat(amount) : null }),
-        ...(grossAmount !== undefined && { grossAmount: grossAmount ? parseFloat(grossAmount) : null }),
+        ...(amount !== undefined && { amount: roundValue(amount) }),
+        ...(grossAmount !== undefined && { grossAmount: roundValue(grossAmount) }),
         ...(updateData.invoiceNo !== undefined && {
           invoiceId: await (async () => {
             if (!updateData.invoiceNo) return null;

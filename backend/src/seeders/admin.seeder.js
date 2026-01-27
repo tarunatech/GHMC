@@ -9,7 +9,7 @@ import { logger } from '../utils/logger.js';
  */
 
 const DEFAULT_ADMIN = {
-  email: 'admin@chemwaste.com',
+  email: 'admin@ghmcwest.com',
   password: 'admin123', // Change this in production!
   fullName: 'Administrator',
   role: 'admin',

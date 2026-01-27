@@ -56,7 +56,7 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   doc.setTextColor(greenColor);
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  const text1 = 'GUJARAT HAZARD WASTE';
+  const text1 = 'GUJARAT HAZARD WEST';
   const text2 = 'MANAGEMENT CO.';
   doc.text(text1, 105, 15, { align: 'center' });
   doc.text(text2, 105, 23, { align: 'center' });
@@ -110,12 +110,13 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   doc.text('Inv. Date', col1 + 2, startY + 12);
   doc.text(invoiceData.date ? format(new Date(invoiceData.date), 'dd.MM.yyyy') : '-', col2 + 2, startY + 12);
   doc.text('Po. Date', col3 + 2, startY + 12);
-  doc.text(invoiceData.poDate || '-', col4 + 2, startY + 12);
+  const poDateFormatted = invoiceData.poDate ? format(new Date(invoiceData.poDate), 'dd.MM.yyyy') : '-';
+  doc.text(poDateFormatted, col4 + 2, startY + 12);
   doc.line(10, startY + 14, 200, startY + 14);
 
   // Row 3
   doc.text('GST No.', col1 + 2, startY + 19);
-  doc.text('24ABDFG3216E1ZZ', col2 + 2, startY + 19); // Always use company GST number
+  doc.text('24ABDFG3216E1ZZ', col2 + 2, startY + 19);
   doc.text('Vehical No.', col3 + 2, startY + 19);
   doc.text(invoiceData.vehicleNo || '-', col4 + 2, startY + 19);
   doc.line(10, startY + 21, 200, startY + 21);
@@ -147,7 +148,7 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   // GSTIN for customer
   if (invoiceData.customerGst) {
     doc.setFont('helvetica', 'bold');
-    doc.text(`GSTIN: ${invoiceData.customerGst}`, 12, addressY + 30); // Adjust Y based on address length
+    doc.text(`GSTIN: ${invoiceData.customerGst}`, 12, addressY + 25);
   }
 
   // Box for Billed/Shipped
@@ -204,22 +205,40 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   });
 
   // 2. Additional Charges Section
-  if (invoiceData.additionalCharges && Number(invoiceData.additionalCharges) > 0) {
+  const hasAdditionalChargesList = invoiceData.additionalChargesList && invoiceData.additionalChargesList.length > 0;
+  const hasTotalAdditionalCharges = invoiceData.additionalCharges && Number(invoiceData.additionalCharges) > 0;
+
+  if (hasAdditionalChargesList || hasTotalAdditionalCharges) {
     tableBody.push([
       { content: '2', styles: { fontStyle: 'bold', halign: 'center' } },
       { content: 'Additional Charges', styles: { fontStyle: 'bold' } },
       '', '', '', '', ''
     ]);
 
-    tableBody.push([
-      '',
-      invoiceData.additionalChargesDescription || 'Additional Charges',
-      '',
-      invoiceData.additionalChargesQuantity ? Number(invoiceData.additionalChargesQuantity).toLocaleString('en-IN') : '',
-      invoiceData.additionalChargesUnit || '',
-      invoiceData.additionalChargesRate ? Number(invoiceData.additionalChargesRate).toFixed(2) : '',
-      Number(invoiceData.additionalCharges).toLocaleString('en-IN')
-    ]);
+    if (hasAdditionalChargesList) {
+      invoiceData.additionalChargesList.forEach((charge: any) => {
+        tableBody.push([
+          '',
+          charge.description || charge.materialName || 'Additional Charge',
+          '',
+          charge.quantity ? Number(charge.quantity).toLocaleString('en-IN') : '',
+          charge.unit || '',
+          charge.rate ? Number(charge.rate).toFixed(2) : '',
+          Number(charge.amount || 0).toLocaleString('en-IN')
+        ]);
+      });
+    } else if (hasTotalAdditionalCharges) {
+      // Fallback for older data with only aggregate amount
+      tableBody.push([
+        '',
+        invoiceData.additionalChargesDescription || 'Additional Charges',
+        '',
+        invoiceData.additionalChargesQuantity ? Number(invoiceData.additionalChargesQuantity).toLocaleString('en-IN') : '',
+        invoiceData.additionalChargesUnit || '',
+        invoiceData.additionalChargesRate ? Number(invoiceData.additionalChargesRate).toFixed(2) : '',
+        Number(invoiceData.additionalCharges).toLocaleString('en-IN')
+      ]);
+    }
   }
 
   // Add empty rows to fill space if needed, or just let autoTable handle it.
@@ -270,9 +289,16 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   // Sub Total row
   doc.rect(10, finalY, 190, 6);
   doc.setFont('helvetica', 'bold');
-  doc.text('Sub Total', 100, finalY + 4, { align: 'right' });
+  doc.text('Sub Total', 98, finalY + 4, { align: 'right' });
   doc.text(totalQuantity.toLocaleString('en-IN'), 130, finalY + 4, { align: 'center' });
   doc.text(Number(subTotal).toLocaleString('en-IN'), 198, finalY + 4, { align: 'right' });
+  // Vertical lines through Sub Total row
+  doc.line(25, finalY, 25, finalY + 6);
+  doc.line(100, finalY, 100, finalY + 6);
+  doc.line(120, finalY, 120, finalY + 6);
+  doc.line(140, finalY, 140, finalY + 6);
+  doc.line(155, finalY, 155, finalY + 6);
+  doc.line(175, finalY, 175, finalY + 6);
   finalY += 6;
 
   // CGST
@@ -282,7 +308,14 @@ export const generateInvoicePDF = async (invoiceData: any) => {
     // Determine Index for CGST/SGST if they exist
     doc.text('2', 17.5, finalY + 4, { align: 'center' });
     doc.text('CGST', 27, finalY + 4);
-    doc.text(Number(cgst).toLocaleString('en-IN'), 198, finalY + 4, { align: 'right' });
+    doc.text(Math.round(Number(cgst)).toLocaleString('en-IN'), 198, finalY + 4, { align: 'right' });
+    // Vertical lines through CGST row
+    doc.line(25, finalY, 25, finalY + 6);
+    doc.line(100, finalY, 100, finalY + 6);
+    doc.line(120, finalY, 120, finalY + 6);
+    doc.line(140, finalY, 140, finalY + 6);
+    doc.line(155, finalY, 155, finalY + 6);
+    doc.line(175, finalY, 175, finalY + 6);
     finalY += 6;
   }
 
@@ -292,15 +325,31 @@ export const generateInvoicePDF = async (invoiceData: any) => {
     doc.setFont('helvetica', 'normal');
     doc.text(Number(cgst) > 0 ? '3' : '2', 17.5, finalY + 4, { align: 'center' });
     doc.text('SGST', 27, finalY + 4);
-    doc.text(Number(sgst).toLocaleString('en-IN'), 198, finalY + 4, { align: 'right' });
+    doc.text(Math.round(Number(sgst)).toLocaleString('en-IN'), 198, finalY + 4, { align: 'right' });
+    // Vertical lines through SGST row
+    doc.line(25, finalY, 25, finalY + 6);
+    doc.line(100, finalY, 100, finalY + 6);
+    doc.line(120, finalY, 120, finalY + 6);
+    doc.line(140, finalY, 140, finalY + 6);
+    doc.line(155, finalY, 155, finalY + 6);
+    doc.line(175, finalY, 175, finalY + 6);
     finalY += 6;
   }
 
   // Grand Total
   doc.rect(10, finalY, 190, 7);
   doc.setFont('helvetica', 'bold');
-  doc.text('Grand Total', 100, finalY + 5, { align: 'right' });
-  doc.text(Number(grandTotal).toLocaleString('en-IN'), 198, finalY + 5, { align: 'right' });
+  doc.text('Grand Total', 98, finalY + 5, { align: 'right' });
+  // Final Grand Total is recalculated based on rounded taxes to maintain document integrity
+  const roundedGrandTotal = Number(subTotal) + Math.round(Number(cgst)) + Math.round(Number(sgst));
+  doc.text(roundedGrandTotal.toLocaleString('en-IN'), 198, finalY + 5, { align: 'right' });
+  // Vertical lines through Grand Total row
+  doc.line(25, finalY, 25, finalY + 7);
+  doc.line(100, finalY, 100, finalY + 7);
+  doc.line(120, finalY, 120, finalY + 7);
+  doc.line(140, finalY, 140, finalY + 7);
+  doc.line(155, finalY, 155, finalY + 7);
+  doc.line(175, finalY, 175, finalY + 7);
   finalY += 7;
 
   // --- Amount in Words ---
@@ -308,7 +357,7 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   doc.setFont('helvetica', 'bold');
   doc.text('In Words: ', 12, finalY + 5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${numberToWords(Math.round(grandTotal))} Only`, 35, finalY + 5);
+  doc.text(`${numberToWords(Math.round(roundedGrandTotal))} Only`, 35, finalY + 5);
   finalY += 8;
 
   // --- Terms & Conditions ---
@@ -323,9 +372,9 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   doc.setFontSize(8);
   doc.text('E & O.E', 12, finalY + 10);
   doc.text('1. Goods once sold will not be taken back.', 12, finalY + 15);
-  doc.text('2. Interest @ 18% p.a. will be charged if the payment is not made within the stipulated time.', 12, finalY + 20, { maxWidth: 100 });
-  doc.text('3. Subject to ‘Delhi’ Jurisdiction only.', 12, finalY + 28);
-  doc.text('We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.', 12, finalY + 33);
+  doc.text('2. Interest @ 18% p.a. shall be charged if the payment is not made within the stipulated time.', 12, finalY + 20);
+  doc.text('3. Subject to ‘Vadodara’ Jurisdiction only.', 12, finalY + 25);
+  doc.text('We declare that this invoice shows the actual price of the goods described and that all particulars are true and correct.', 12, finalY + 31);
 
   finalY += 35;
 
@@ -346,28 +395,22 @@ export const generateInvoicePDF = async (invoiceData: any) => {
 
   doc.setFont('helvetica', 'normal');
   doc.text('Bank Name: The Kalupur Commercial Co-Op. Bank Ltd.', 12, finalY + 12);
-  doc.text('Name: GUJARAT HAZARD WASTE MANAGEMENT CO.', 12, finalY + 17);
+  doc.text('Name: GUJARAT HAZARDWEST MANAGEMENT CO.', 12, finalY + 17);
   doc.text('Bank A/c No.: 02420101464', 12, finalY + 22);
   doc.text('IFSC Code: KCCB0VDD024', 12, finalY + 27);
-  doc.text('Payment Terms: Immediate', 12, finalY + 32);
+  doc.text('Payment Terms: ', 12, finalY + 32);
 
   // Signature (Right)
+  const centerX = 105 + (190 / 2); // Center of the right side (105 to 200)
   doc.setFontSize(8);
-  doc.text('For GUJARAT HAZARD WASTE MANAGEMENT CO.', 107, finalY + 5);
-
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.text('SHIVRAJSINH', 107, finalY + 15);
-  doc.text('RAYSANGJI', 107, finalY + 22);
-  doc.text('GOHIL', 107, finalY + 29);
+  doc.text('For GUJARAT HAZARD WEST MANAGEMENT CO.', 152.5, finalY + 10, { align: 'center' });
 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text('Autorised Signatory', 160, finalY + 35, { align: 'right' });
+  doc.text('Autorised Signatory', 152.5, finalY + 32, { align: 'center' });
 
-  // Bottom text
-  doc.setFontSize(8);
-  doc.text('This is computergenerated invoice', 105, finalY + footerHeight + 4, { align: 'center' });
+  // Bottom text removed as requested: This is computergenerated invoice
+  // doc.text('This is computergenerated invoice', 105, finalY + footerHeight + 4, { align: 'center' });
 
   // Save PDF
   doc.save(`Invoice_${invoiceData.invoiceNo}.pdf`);

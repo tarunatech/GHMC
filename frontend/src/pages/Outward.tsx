@@ -8,6 +8,8 @@ import { StatusBadge } from "@/components/common/StatusBadge";
 import { Plus, Search, Filter, Eye, Trash2, Loader2, Edit, FileText, Download, Building2, Calendar, Truck, ChevronDown } from "lucide-react";
 import outwardService, { OutwardEntry, CreateOutwardEntryData, UpdateOutwardEntryData } from "@/services/outward.service";
 import transportersService from "@/services/transporters.service";
+import invoicesService from "@/services/invoices.service";
+import { generateInvoicePDF } from "@/utils/pdfGenerator";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
@@ -16,8 +18,9 @@ import OutwardMaterialForm from "@/components/common/OutwardMaterialForm";
 import outwardMaterialsService from "@/services/outwardMaterials.service";
 import { OutwardMaterial } from "@/services/outward.service";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { isNotFutureDate, isValidManifestNumber, isPositiveNumber, isNonNegativeNumber } from "@/utils/validation";
+import { isNotFutureDate, isValidManifestNumber, isPositiveNumber, isNonNegativeNumber, roundToTwoDecimals } from "@/utils/validation";
 import { exportToCSV, formatDateForExport, formatCurrencyForExport } from "@/utils/export";
+import { getErrorMessage, logError } from "@/utils/errorHandler";
 
 import { useAuth } from "@/contexts/AuthContext";
 import {
@@ -46,6 +49,8 @@ export default function Outward() {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [displayedEntriesCount, setDisplayedEntriesCount] = useState(4);
+  const [displayedMaterialsCount, setDisplayedMaterialsCount] = useState(4);
 
 
 
@@ -99,7 +104,8 @@ export default function Outward() {
       setIsModalOpen(false);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to create entry');
+      logError('Creating outward entry', error);
+      toast.error(getErrorMessage(error, 'Failed to create entry'));
     },
   });
 
@@ -118,7 +124,8 @@ export default function Outward() {
       setEditingEntry(null);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to update entry');
+      logError('Updating outward entry', error);
+      toast.error(getErrorMessage(error, 'Failed to update entry'));
     },
   });
 
@@ -135,7 +142,8 @@ export default function Outward() {
       toast.success('Entry deleted successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to delete entry');
+      logError('Deleting outward entry', error);
+      toast.error(getErrorMessage(error, 'Failed to delete entry'));
     },
 
   });
@@ -149,7 +157,8 @@ export default function Outward() {
       setIsMaterialModalOpen(false);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to create material record');
+      logError('Creating outward material', error);
+      toast.error(getErrorMessage(error, 'Failed to create material record'));
     },
   });
 
@@ -163,7 +172,8 @@ export default function Outward() {
       setEditingMaterial(null);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to update material record');
+      logError('Updating outward material', error);
+      toast.error(getErrorMessage(error, 'Failed to update material record'));
     },
   });
 
@@ -175,7 +185,8 @@ export default function Outward() {
       toast.success('Material record deleted successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to delete material record');
+      logError('Deleting outward material', error);
+      toast.error(getErrorMessage(error, 'Failed to delete material record'));
     },
   });
 
@@ -276,7 +287,7 @@ export default function Outward() {
 
 
   const columns = [
-    { key: "srNo", header: "Sr No.", render: (e: OutwardEntry) => e.srNo || '-' },
+    { key: "srNo", header: "Sr No.", render: (_: OutwardEntry, index: number) => index + 1 },
     { key: "month", header: "Month", render: (e: OutwardEntry) => e.month || '-' },
     { key: "date", header: "Date", render: (e: OutwardEntry) => format(new Date(e.date), 'dd MMM yyyy') },
     {
@@ -609,6 +620,7 @@ export default function Outward() {
           totalPages={pagination.totalPages}
           onPageChange={(page) => setCurrentPage(page)}
           isLoading={isLoading || isFetching}
+          maxHeight="400px"
         />
       )}
 
@@ -619,7 +631,7 @@ export default function Outward() {
             <h2 className="text-xl font-semibold text-foreground">Outward Transporter Records</h2>
             <p className="text-sm text-muted-foreground">Manage transporter invoices and payments for outward/dispatch</p>
           </div>
-          {user?.role === 'superadmin' && (
+          {user?.role !== 'admin' && (
             <Button onClick={() => {
               setEditingMaterial(null);
               setIsMaterialModalOpen(true);
@@ -629,60 +641,64 @@ export default function Outward() {
           )}
         </div>
 
-        <DataTable
-          columns={[
-            { key: "date", header: "Date", render: (m: OutwardMaterial) => m.date ? format(new Date(m.date), 'dd MMM yyyy') : '-' },
-            { key: "month", header: "Month", render: (m: OutwardMaterial) => m.month || m.outwardEntry?.month || '-' },
-            { key: "transporterName", header: "Transporter" },
-            { key: "manifestNo", header: "Manifest No.", render: (m: OutwardMaterial) => m.manifestNo || '-' },
-            { key: "vehicleNo", header: "Vehicle No.", render: (m: OutwardMaterial) => m.vehicleNo || '-' },
-            { key: "wasteName", header: "Waste Name", render: (m: OutwardMaterial) => m.wasteName || '-' },
-            { key: "quantity", header: "Quantity", render: (m: OutwardMaterial) => m.quantity ? `${m.quantity} ${m.unit || ''}` : '-' },
-            { key: "vehicleCapacity", header: "Vehicle Capacity", render: (m: OutwardMaterial) => m.vehicleCapacity || '-' },
-            ...(user?.role === 'admin' || user?.role === 'superadmin' ? [
-              { key: "rate", header: "Rate", render: (m: OutwardMaterial) => (m.rate !== null && m.rate !== undefined) ? `₹${Number(m.rate).toFixed(2)}` : '-' },
-              { key: "amount", header: "Amount", render: (m: OutwardMaterial) => (m.amount !== null && m.amount !== undefined) ? `₹${Number(m.amount).toFixed(2)}` : '-' },
-              { key: "detCharges", header: "Det. Charges", render: (m: OutwardMaterial) => (m.detCharges !== null && m.detCharges !== undefined) ? `₹${Number(m.detCharges).toFixed(2)}` : '-' },
-              { key: "gst", header: "GST", render: (m: OutwardMaterial) => (m.gst !== null && m.gst !== undefined) ? `₹${Number(m.gst).toFixed(2)}` : '-' },
-              { key: "grossAmount", header: "Gross Amount", render: (m: OutwardMaterial) => (m.grossAmount !== null && m.grossAmount !== undefined) ? `₹${Number(m.grossAmount).toFixed(2)}` : '-' },
-              { key: "invoiceNo", header: "Invoice No.", render: (m: OutwardMaterial) => m.invoiceNo || '-' },
-              { key: "paidOn", header: "Paid On", render: (m: OutwardMaterial) => m.paidOn ? format(new Date(m.paidOn), 'dd MMM yyyy') : '-' },
-            ] : []),
-            {
-              key: "actions",
-              header: "Actions",
-              render: (m: OutwardMaterial) => (
-                <div className="flex items-center gap-2">
-                  {user?.role === 'superadmin' && (
-                    <>
-                      <button
-                        onClick={() => {
-                          setEditingMaterial(m);
-                          setIsMaterialModalOpen(true);
-                        }}
-                        className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                        title="Edit"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteMaterial(m.id)}
-                        disabled={deleteMaterialMutation.isPending}
-                        className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              ),
-            },
-          ]}
-          data={materials}
-          keyExtractor={(material) => material.id}
-          emptyMessage="No outward material records found"
-        />
+        <div className="space-y-4">
+          <DataTable
+            columns={[
+              { key: "srNo", header: "Sr No.", render: (_: any, index: number) => index + 1, className: "w-16" },
+              { key: "date", header: "Date", render: (m: OutwardMaterial) => m.date ? format(new Date(m.date), 'dd MMM yyyy') : '-' },
+              { key: "month", header: "Month", render: (m: OutwardMaterial) => m.month || m.outwardEntry?.month || '-' },
+              { key: "transporterName", header: "Transporter" },
+              { key: "manifestNo", header: "Manifest No.", render: (m: OutwardMaterial) => m.manifestNo || '-' },
+              { key: "vehicleNo", header: "Vehicle No.", render: (m: OutwardMaterial) => m.vehicleNo || '-' },
+              { key: "wasteName", header: "Waste Name", render: (m: OutwardMaterial) => m.wasteName || '-' },
+              { key: "quantity", header: "Quantity", render: (m: OutwardMaterial) => m.quantity ? `${m.quantity} ${m.unit || ''}` : '-' },
+              { key: "vehicleCapacity", header: "Vehicle Capacity", render: (m: OutwardMaterial) => m.vehicleCapacity || '-' },
+              ...(user?.role === 'admin' || user?.role === 'superadmin' ? [
+                { key: "rate", header: "Rate", render: (m: OutwardMaterial) => (m.rate !== null && m.rate !== undefined) ? `₹${Number(m.rate).toFixed(2)}` : '-' },
+                { key: "amount", header: "Amount", render: (m: OutwardMaterial) => (m.amount !== null && m.amount !== undefined) ? `₹${Number(m.amount).toFixed(2)}` : '-' },
+                { key: "detCharges", header: "Det. Charges", render: (m: OutwardMaterial) => (m.detCharges !== null && m.detCharges !== undefined) ? `₹${Number(m.detCharges).toFixed(2)}` : '-' },
+                { key: "gst", header: "GST", render: (m: OutwardMaterial) => (m.gst !== null && m.gst !== undefined) ? `₹${Number(m.gst).toFixed(2)}` : '-' },
+                { key: "grossAmount", header: "Gross Amount", render: (m: OutwardMaterial) => (m.grossAmount !== null && m.grossAmount !== undefined) ? `₹${Number(m.grossAmount).toFixed(2)}` : '-' },
+                { key: "invoiceNo", header: "Invoice No.", render: (m: OutwardMaterial) => m.invoiceNo || '-' },
+                { key: "paidOn", header: "Paid On", render: (m: OutwardMaterial) => m.paidOn ? format(new Date(m.paidOn), 'dd MMM yyyy') : '-' },
+              ] : []),
+              {
+                key: "actions",
+                header: "Actions",
+                render: (m: OutwardMaterial) => (
+                  <div className="flex items-center gap-2">
+                    {user?.role !== 'admin' && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setEditingMaterial(m);
+                            setIsMaterialModalOpen(true);
+                          }}
+                          className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                          title="Edit"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMaterial(m.id)}
+                          disabled={deleteMaterialMutation.isPending}
+                          className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ),
+              },
+            ]}
+            data={materials}
+            keyExtractor={(material) => material.id}
+            emptyMessage="No outward material records found"
+            maxHeight="400px"
+          />
+        </div>
       </div>
 
       {/* Create Entry Modal */}
@@ -871,7 +887,17 @@ function OutwardEntryForm({ transporters, entry, onCancel, onSubmit, isLoading }
       return;
     }
 
-    onSubmit(formData);
+    const roundedData = {
+      ...formData,
+      quantity: roundToTwoDecimals(formData.quantity),
+      rate: roundToTwoDecimals(formData.rate),
+      amount: roundToTwoDecimals(formData.amount),
+      detCharges: roundToTwoDecimals(formData.detCharges),
+      gst: roundToTwoDecimals(formData.gst),
+      grossAmount: roundToTwoDecimals(formData.grossAmount),
+      vehicleCapacity: roundToTwoDecimals(formData.vehicleCapacity),
+    };
+    onSubmit(roundedData);
   };
 
   return (
@@ -1124,6 +1150,65 @@ function OutwardEntryForm({ transporters, entry, onCancel, onSubmit, isLoading }
 // Entry Details Component
 function OutwardEntryDetails({ entry }: { entry: OutwardEntry }) {
   const { user } = useAuth();
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadInvoice = async () => {
+    if (!entry.invoice?.id) return;
+
+    try {
+      setIsDownloading(true);
+      const invoiceData = await invoicesService.getInvoiceById(entry.invoice.id);
+
+      const materials = (invoiceData.invoiceMaterials || []).filter(m => !(m as any).isAdditionalCharge);
+      const additionalChargesList = (invoiceData.invoiceMaterials || []).filter(m => (m as any).isAdditionalCharge);
+
+      const pdfData = {
+        invoiceNo: invoiceData.invoiceNo,
+        poNo: null,
+        date: invoiceData.date,
+        poDate: null,
+        vehicleNo: entry.vehicleNo,
+        customerName: invoiceData.customerName || entry.cementCompany || '',
+        customerAddress: invoiceData.billedTo || '',
+        customerGst: invoiceData.gstNo || '',
+        description: invoiceData.description || '',
+        items: materials.length > 0
+          ? materials.map(m => ({
+            description: (m as any).description || '',
+            materialName: m.materialName,
+            manifestNo: (m as any).manifestNo || '',
+            hsnCode: '999432',
+            quantity: m.quantity,
+            unit: m.unit,
+            rate: m.rate,
+            amount: m.amount
+          }))
+          : [{
+            description: '',
+            manifestNo: entry.manifestNo || '',
+            hsnCode: '999432',
+            quantity: entry.quantity,
+            unit: entry.unit,
+            rate: Number(entry.rate),
+            amount: Number(entry.amount)
+          }],
+        subTotal: invoiceData.subtotal,
+        cgst: invoiceData.cgst || 0,
+        sgst: invoiceData.sgst || 0,
+        additionalCharges: invoiceData.additionalCharges || 0,
+        additionalChargesList: additionalChargesList,
+        grandTotal: invoiceData.grandTotal
+      };
+
+      await generateInvoicePDF(pdfData);
+      toast.success("Invoice downloaded successfully");
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to download invoice");
+    } finally {
+      setIsDownloading(false);
+    }
+  };
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -1183,9 +1268,9 @@ function OutwardEntryDetails({ entry }: { entry: OutwardEntry }) {
       <div className="pt-4 border-t border-border">
         <h4 className="font-medium text-foreground mb-3">Transporter Records</h4>
         {entry.outwardMaterials && entry.outwardMaterials.length > 0 ? (
-          <div className="overflow-x-auto rounded-xl border border-border">
+          <div className="overflow-x-auto overflow-y-auto max-h-[300px] rounded-xl border border-border">
             <table className="w-full text-sm text-left">
-              <thead className="bg-secondary/50 text-muted-foreground uppercase text-xs">
+              <thead className="bg-secondary/50 text-muted-foreground uppercase text-xs sticky top-0 z-[5]">
                 <tr>
                   <th className="px-4 py-2 font-semibold">Transporter</th>
                   <th className="px-4 py-2 font-semibold text-right">Quantity</th>
@@ -1276,6 +1361,18 @@ function OutwardEntryDetails({ entry }: { entry: OutwardEntry }) {
                 {entry.paidOn ? format(new Date(entry.paidOn), 'dd MMM yyyy') : '-'}
               </p>
             </div>
+          </div>
+          <div className="flex items-center justify-between">
+            <h4 className="font-medium text-foreground invisible">Actions</h4>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadInvoice}
+              disabled={isDownloading}
+            >
+              {isDownloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+              Download PDF
+            </Button>
           </div>
         </>
       )}

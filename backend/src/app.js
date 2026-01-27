@@ -16,8 +16,24 @@ app.set('trust proxy', 1);
 app.use(helmet());
 
 // CORS must be before rate limiter so that rate-limited responses still have CORS headers
+// CORS must be before rate limiter so that rate-limited responses still have CORS headers
 app.use(cors({
-  origin: config.cors.origin,
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    // In development, allow any localhost
+    if (config.nodeEnv === 'development' && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
+      return callback(null, true);
+    }
+
+    // Check against configured origin
+    if (origin === config.cors.origin) {
+      return callback(null, true);
+    }
+
+    callback(new Error('Not allowed by CORS'));
+  },
   credentials: true,
 }));
 

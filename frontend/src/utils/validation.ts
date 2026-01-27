@@ -108,3 +108,13 @@ export function isValidLotNumber(lot: string): boolean {
   return lot.trim().length >= 2; // At least 2 characters
 }
 
+/**
+ * Round a number to 2 decimal places
+ */
+export function roundToTwoDecimals(value: number | string | undefined | null): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return undefined;
+  return Math.round((num + Number.EPSILON) * 100) / 100;
+}
+

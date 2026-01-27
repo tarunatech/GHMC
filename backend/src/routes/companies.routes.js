@@ -30,7 +30,7 @@ router.get('/:id', authenticate, companiesController.getCompanyById.bind(compani
 router.post(
   '/',
   authenticate,
-  authorize(['superadmin', 'employee']),
+  authorize(['superadmin', 'admin', 'employee']),
   validate(createCompanySchema),
   companiesController.createCompany.bind(companiesController)
 );
@@ -39,13 +39,13 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize(['superadmin', 'employee']),
+  authorize(['superadmin', 'admin', 'employee']),
   validate(updateCompanySchema),
   companiesController.updateCompany.bind(companiesController)
 );
 
 // Delete company
-router.delete('/:id', authenticate, authorize(['superadmin', 'employee']), companiesController.deleteCompany.bind(companiesController));
+router.delete('/:id', authenticate, authorize(['superadmin', 'admin', 'employee']), companiesController.deleteCompany.bind(companiesController));
 
 // Get company materials
 router.get('/:id/materials', authenticate, companiesController.getCompanyMaterials.bind(companiesController));
@@ -54,7 +54,7 @@ router.get('/:id/materials', authenticate, companiesController.getCompanyMateria
 router.post(
   '/:id/materials',
   authenticate,
-  authorize(['superadmin', 'employee']),
+  authorize(['superadmin', 'admin', 'employee']),
   validate(addMaterialSchema),
   companiesController.addMaterial.bind(companiesController)
 );
@@ -63,7 +63,7 @@ router.post(
 router.put(
   '/:id/materials/:materialId',
   authenticate,
-  authorize(['superadmin', 'employee']),
+  authorize(['superadmin', 'admin', 'employee']),
   validate(updateMaterialSchema),
   companiesController.updateMaterial.bind(companiesController)
 );
@@ -72,7 +72,7 @@ router.put(
 router.delete(
   '/:id/materials/:materialId',
   authenticate,
-  authorize(['superadmin', 'employee']),
+  authorize(['superadmin', 'admin', 'employee']),
   companiesController.removeMaterial.bind(companiesController)
 );
 

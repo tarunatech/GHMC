@@ -47,6 +47,7 @@ export interface Invoice {
     amount: number | null;
     manifestNo: string | null;
     description: string | null;
+    isAdditionalCharge?: boolean;
   }>;
   inwardEntries?: Array<{
     id: string;
@@ -69,6 +70,9 @@ export interface Invoice {
   }>;
   createdAt: string;
   updatedAt: string;
+  poNo: string | null;
+  poDate: string | null;
+  vehicleNo: string | null;
 }
 
 export interface CreateInvoiceData {
@@ -103,6 +107,16 @@ export interface CreateInvoiceData {
   additionalChargesUnit?: string;
   paymentReceived?: number;
   paymentReceivedOn?: string;
+  additionalChargesList?: Array<{
+    description: string;
+    quantity: number;
+    rate: number;
+    amount: number;
+    unit: string;
+  }>;
+  poNo?: string;
+  poDate?: string;
+  vehicleNo?: string;
 }
 
 export interface UpdateInvoiceData {
@@ -130,6 +144,16 @@ export interface UpdateInvoiceData {
   additionalChargesQuantity?: number;
   additionalChargesRate?: number;
   additionalChargesUnit?: string;
+  additionalChargesList?: Array<{
+    description: string;
+    quantity: number;
+    rate: number;
+    amount: number;
+    unit: string;
+  }> | null;
+  poNo?: string;
+  poDate?: string;
+  vehicleNo?: string;
 }
 
 export interface UpdatePaymentData {

@@ -10,7 +10,7 @@ import { logger } from '../utils/logger.js';
  */
 
 const DEFAULT_SUPERADMIN = {
-    email: 'superadmin@chemwaste.com',
+    email: 'superadmin@ghmcwest.com',
     password: 'superadmin123', // Change this in production!
     fullName: 'Super Administrator',
     role: 'superadmin',

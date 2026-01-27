@@ -186,7 +186,7 @@ export const createInwardMaterialSchema = Joi.object({
     'any.required': 'Transporter name is required',
   }),
   invoiceNo: Joi.string().optional().allow('', null),
-  vehicleCapacity: Joi.string().optional().allow('', null),
+  vehicleCapacity: Joi.alternatives().try(Joi.string(), Joi.number()).optional().allow('', null),
   rate: Joi.number().positive().optional().allow(null),
   detCharges: Joi.number().positive().optional().allow(null),
   gst: Joi.number().positive().optional().allow(null),
@@ -206,7 +206,7 @@ export const updateInwardMaterialSchema = Joi.object({
   unit: Joi.string().valid('MT', 'Kg', 'KL').optional().allow('', null),
   transporterName: Joi.string().min(1).optional(),
   invoiceNo: Joi.string().optional().allow('', null),
-  vehicleCapacity: Joi.string().optional().allow('', null),
+  vehicleCapacity: Joi.alternatives().try(Joi.string(), Joi.number()).optional().allow('', null),
   rate: Joi.number().positive().optional().allow(null),
   detCharges: Joi.number().positive().optional().allow(null),
   gst: Joi.number().positive().optional().allow(null),
@@ -227,7 +227,7 @@ export const createOutwardMaterialSchema = Joi.object({
     'any.required': 'Transporter name is required',
   }),
   invoiceNo: Joi.string().optional().allow('', null),
-  vehicleCapacity: Joi.string().optional().allow('', null),
+  vehicleCapacity: Joi.alternatives().try(Joi.string(), Joi.number()).optional().allow('', null),
   rate: Joi.number().positive().optional().allow(null),
   detCharges: Joi.number().positive().optional().allow(null),
   gst: Joi.number().positive().optional().allow(null),
@@ -246,7 +246,7 @@ export const updateOutwardMaterialSchema = Joi.object({
   unit: Joi.string().valid('MT', 'Kg', 'KL').optional().allow('', null),
   transporterName: Joi.string().min(1).optional(),
   invoiceNo: Joi.string().optional().allow('', null),
-  vehicleCapacity: Joi.string().optional().allow('', null),
+  vehicleCapacity: Joi.alternatives().try(Joi.string(), Joi.number()).optional().allow('', null),
   rate: Joi.number().positive().optional().allow(null),
   detCharges: Joi.number().positive().optional().allow(null),
   gst: Joi.number().positive().optional().allow(null),
@@ -281,7 +281,7 @@ export const createOutwardEntrySchema = Joi.object({
   amount: Joi.number().optional().allow(null),
   gst: Joi.number().optional().allow(null),
   grossAmount: Joi.number().optional().allow(null),
-  vehicleCapacity: Joi.string().optional().allow('', null),
+  vehicleCapacity: Joi.alternatives().try(Joi.string(), Joi.number()).optional().allow('', null),
   detCharges: Joi.number().optional().allow(null),
   paidOn: Joi.date().optional().allow(null),
   dueOn: Joi.date().optional().allow(null),
@@ -305,7 +305,7 @@ export const updateOutwardEntrySchema = Joi.object({
   amount: Joi.number().optional().allow(null),
   gst: Joi.number().optional().allow(null),
   grossAmount: Joi.number().optional().allow(null),
-  vehicleCapacity: Joi.string().optional().allow('', null),
+  vehicleCapacity: Joi.alternatives().try(Joi.string(), Joi.number()).optional().allow('', null),
   detCharges: Joi.number().optional().allow(null),
   paidOn: Joi.date().optional().allow(null),
   dueOn: Joi.date().optional().allow(null),
@@ -352,6 +352,18 @@ export const createInvoiceSchema = Joi.object({
   additionalChargesQuantity: Joi.number().min(0).optional().default(0),
   additionalChargesRate: Joi.number().min(0).optional().default(0),
   additionalChargesUnit: Joi.string().optional().allow('', null),
+  additionalChargesList: Joi.array().items(
+    Joi.object({
+      description: Joi.string().required(),
+      quantity: Joi.number().optional().allow(null, 0),
+      rate: Joi.number().optional().allow(null, 0),
+      amount: Joi.number().optional().allow(null, 0),
+      unit: Joi.string().optional().allow('', null),
+    })
+  ).optional().default([]),
+  poNo: Joi.string().optional().allow('', null),
+  poDate: Joi.date().optional().allow(null, ''),
+  vehicleNo: Joi.string().optional().allow('', null),
 });
 
 export const updateInvoiceSchema = Joi.object({
@@ -384,6 +396,18 @@ export const updateInvoiceSchema = Joi.object({
   additionalChargesQuantity: Joi.number().min(0).optional().allow(null),
   additionalChargesRate: Joi.number().min(0).optional().allow(null),
   additionalChargesUnit: Joi.string().optional().allow('', null),
+  additionalChargesList: Joi.array().items(
+    Joi.object({
+      description: Joi.string().required(),
+      quantity: Joi.number().optional().allow(null, 0),
+      rate: Joi.number().optional().allow(null, 0),
+      amount: Joi.number().optional().allow(null, 0),
+      unit: Joi.string().optional().allow('', null),
+    })
+  ).optional().allow(null),
+  poNo: Joi.string().optional().allow('', null),
+  poDate: Joi.date().optional().allow(null, ''),
+  vehicleNo: Joi.string().optional().allow('', null),
 });
 
 export const updateInvoicePaymentSchema = Joi.object({

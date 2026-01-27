@@ -215,13 +215,6 @@ class DashboardService {
         orderBy: {
           createdAt: 'desc',
         },
-        include: {
-          company: {
-            select: {
-              name: true,
-            },
-          },
-        },
         select: {
           id: true,
           date: true,
@@ -241,13 +234,6 @@ class DashboardService {
         take: limit,
         orderBy: {
           createdAt: 'desc',
-        },
-        include: {
-          transporter: {
-            select: {
-              name: true,
-            },
-          },
         },
         select: {
           id: true,

@@ -122,11 +122,13 @@ class InvoicesService {
       sgst = (baseForTax * rates.sgst) / 100;
     }
 
-    const grandTotal = baseForTax + cgst + sgst;
+    const roundedCgst = Math.round(cgst);
+    const roundedSgst = Math.round(sgst);
+    const grandTotal = baseForTax + roundedCgst + roundedSgst;
 
     return {
-      cgst: parseFloat(cgst.toFixed(2)),
-      sgst: parseFloat(sgst.toFixed(2)),
+      cgst: roundedCgst,
+      sgst: roundedSgst,
       grandTotal: parseFloat(grandTotal.toFixed(2)),
     };
   }
@@ -242,6 +244,7 @@ class InvoicesService {
               quantity: true,
               amount: true,
               manifestNo: true,
+              isAdditionalCharge: true,
             },
           },
         },
@@ -306,6 +309,8 @@ class InvoicesService {
             quantity: true,
             amount: true,
             manifestNo: true,
+            description: true,
+            isAdditionalCharge: true,
           },
         },
         inwardEntries: {
@@ -381,6 +386,10 @@ class InvoicesService {
       additionalChargesUnit,
       paymentReceived,
       paymentReceivedOn,
+      additionalChargesList = [],
+      poNo,
+      poDate,
+      vehicleNo,
     } = invoiceData;
 
     // Validate type
@@ -431,7 +440,9 @@ class InvoicesService {
 
     // Calculate totals
     const calculatedSubtotal = subtotal || materials.reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0);
-    const initialAdditionalCharges = additionalCharges ? parseFloat(additionalCharges) : 0;
+    const initialAdditionalCharges = additionalChargesList.length > 0
+      ? additionalChargesList.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0)
+      : (additionalCharges ? parseFloat(additionalCharges) : 0);
     const totals = await this.calculateTotals(calculatedSubtotal, { cgstRate, sgstRate, additionalCharges: initialAdditionalCharges });
 
     // Determine status
@@ -481,21 +492,36 @@ class InvoicesService {
         additionalChargesQuantity: additionalChargesQuantity ? parseFloat(additionalChargesQuantity) : 0,
         additionalChargesRate: additionalChargesRate ? parseFloat(additionalChargesRate) : 0,
         additionalChargesUnit: additionalChargesUnit || null,
+        poNo: poNo || null,
+        poDate: poDate ? new Date(poDate) : null,
+        vehicleNo: vehicleNo || null,
         invoiceManifests: {
           create: manifestNos.map((manifestNo) => ({
             manifestNo,
           })),
         },
         invoiceMaterials: {
-          create: materials.map((material) => ({
-            materialName: material.materialName,
-            rate: material.rate ? parseFloat(material.rate) : null,
-            unit: material.unit || null,
-            quantity: material.quantity ? parseFloat(material.quantity) : null,
-            amount: material.amount ? parseFloat(material.amount) : null,
-            manifestNo: material.manifestNo || null,
-            description: material.description || null,
-          })),
+          create: [
+            ...materials.map((material) => ({
+              materialName: material.materialName,
+              rate: material.rate ? parseFloat(material.rate) : null,
+              unit: material.unit || null,
+              quantity: material.quantity ? parseFloat(material.quantity) : null,
+              amount: material.amount ? parseFloat(material.amount) : null,
+              manifestNo: material.manifestNo || null,
+              description: material.description || null,
+              isAdditionalCharge: false,
+            })),
+            ...additionalChargesList.map((charge) => ({
+              materialName: charge.description || 'Additional Charge',
+              rate: charge.rate ? parseFloat(charge.rate) : null,
+              unit: charge.unit || null,
+              quantity: charge.quantity ? parseFloat(charge.quantity) : null,
+              amount: charge.amount ? parseFloat(charge.amount) : null,
+              description: charge.description || null,
+              isAdditionalCharge: true,
+            })),
+          ],
         },
       },
       include: {
@@ -608,6 +634,10 @@ class InvoicesService {
       additionalChargesRate,
       additionalChargesUnit,
       inwardEntryIds,
+      additionalChargesList = null,
+      poNo,
+      poDate,
+      vehicleNo,
     } = updateData;
 
 
@@ -623,17 +653,19 @@ class InvoicesService {
       grandTotal: invoice.grandTotal,
     };
 
-    if (subtotal !== undefined || materials !== null) {
-      const newSubtotal = subtotal !== undefined
-        ? subtotal
-        : materials?.reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0) || invoice.subtotal;
+    const newSubtotal = subtotal !== undefined
+      ? subtotal
+      : materials?.reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0) || invoice.subtotal;
 
-      totals = await this.calculateTotals(newSubtotal, {
-        cgstRate,
-        sgstRate,
-        additionalCharges: additionalCharges !== undefined ? parseFloat(additionalCharges) : parseFloat(invoice.additionalCharges || 0)
-      });
-    }
+    const newAdditionalCharges = additionalChargesList !== null
+      ? additionalChargesList.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0)
+      : (additionalCharges !== undefined ? parseFloat(additionalCharges) : parseFloat(invoice.additionalCharges || 0));
+
+    totals = await this.calculateTotals(newSubtotal, {
+      cgstRate,
+      sgstRate,
+      additionalCharges: newAdditionalCharges
+    });
 
     // Update status based on payment
     const status = this.getStatus(
@@ -661,6 +693,9 @@ class InvoicesService {
       additionalChargesQuantity: additionalChargesQuantity !== undefined ? parseFloat(additionalChargesQuantity) : undefined,
       additionalChargesRate: additionalChargesRate !== undefined ? parseFloat(additionalChargesRate) : undefined,
       additionalChargesUnit,
+      poNo,
+      poDate: poDate !== undefined ? (poDate ? new Date(poDate) : null) : undefined,
+      vehicleNo,
     };
 
     // Remove undefined values
@@ -680,26 +715,44 @@ class InvoicesService {
       },
     });
 
-    // Update materials if provided
-    if (materials !== null) {
-      // Delete existing materials
+    // Update materials and additional charges if provided
+    if (materials !== null || additionalChargesList !== null) {
+      // Delete existing entries (both materials and charges)
       await prisma.invoiceMaterial.deleteMany({
         where: { invoiceId },
       });
 
-      // Create new materials
-      if (materials.length > 0) {
+      const finalMaterials = materials || invoice.invoiceMaterials?.filter(m => !m.isAdditionalCharge) || [];
+      const finalCharges = additionalChargesList || invoice.invoiceMaterials?.filter(m => m.isAdditionalCharge) || [];
+
+      // Create new items
+      const createData = [
+        ...finalMaterials.map((m) => ({
+          invoiceId,
+          materialName: m.materialName,
+          rate: m.rate ? parseFloat(m.rate) : null,
+          unit: m.unit || null,
+          quantity: m.quantity ? parseFloat(m.quantity) : null,
+          amount: m.amount ? parseFloat(m.amount) : null,
+          manifestNo: m.manifestNo || null,
+          description: m.description || null,
+          isAdditionalCharge: false,
+        })),
+        ...finalCharges.map((c) => ({
+          invoiceId,
+          materialName: c.materialName || c.description || 'Additional Charge',
+          rate: c.rate ? parseFloat(c.rate) : null,
+          unit: c.unit || null,
+          quantity: c.quantity ? parseFloat(c.quantity) : null,
+          amount: c.amount ? parseFloat(c.amount) : null,
+          description: c.description || null,
+          isAdditionalCharge: true,
+        })),
+      ];
+
+      if (createData.length > 0) {
         await prisma.invoiceMaterial.createMany({
-          data: materials.map((material) => ({
-            invoiceId,
-            materialName: material.materialName,
-            rate: material.rate ? parseFloat(material.rate) : null,
-            unit: material.unit || null,
-            quantity: material.quantity ? parseFloat(material.quantity) : null,
-            amount: material.amount ? parseFloat(material.amount) : null,
-            manifestNo: material.manifestNo || null,
-            description: material.description || null,
-          })),
+          data: createData,
         });
       }
     }

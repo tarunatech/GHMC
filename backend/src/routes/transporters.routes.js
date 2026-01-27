@@ -24,7 +24,7 @@ router.get('/:id', authenticate, transportersController.getTransporterById.bind(
 router.post(
   '/',
   authenticate,
-  authorize(['superadmin', 'employee']),
+  authorize(['superadmin', 'admin', 'employee']),
   validate(createTransporterSchema),
   transportersController.createTransporter.bind(transportersController)
 );
@@ -33,13 +33,13 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize(['superadmin', 'employee']),
+  authorize(['superadmin', 'admin', 'employee']),
   validate(updateTransporterSchema),
   transportersController.updateTransporter.bind(transportersController)
 );
 
 // Delete transporter
-router.delete('/:id', authenticate, authorize(['superadmin', 'employee']), transportersController.deleteTransporter.bind(transportersController));
+router.delete('/:id', authenticate, authorize(['superadmin', 'admin', 'employee']), transportersController.deleteTransporter.bind(transportersController));
 
 // Get transporter statistics
 router.get('/:id/stats', authenticate, transportersController.getTransporterStats.bind(transportersController));

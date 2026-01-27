@@ -14,6 +14,7 @@ import CreateInvoiceModal from "@/components/common/CreateInvoiceModal";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { exportToCSV, formatDateForExport, formatCurrencyForExport } from "@/utils/export";
 import { generateInvoicePDF } from "@/utils/pdfGenerator";
+import { getErrorMessage, logError } from "@/utils/errorHandler";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function Invoices() {
@@ -74,7 +75,8 @@ export default function Invoices() {
       setSelectedInvoice(null);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to update payment');
+      logError('Updating payment', error);
+      toast.error(getErrorMessage(error, 'Failed to update payment'));
     },
   });
 
@@ -91,7 +93,8 @@ export default function Invoices() {
       toast.success('Invoice deleted successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to delete invoice');
+      logError('Deleting invoice', error);
+      toast.error(getErrorMessage(error, 'Failed to delete invoice'));
     },
   });
 
@@ -140,19 +143,23 @@ export default function Invoices() {
         vehicleNo = (fullInvoice.inwardEntries[0] as any).vehicleNo;
       }
 
+      const materials = (fullInvoice.invoiceMaterials || []).filter(m => !(m as any).isAdditionalCharge);
+      const additionalChargesList = (fullInvoice.invoiceMaterials || []).filter(m => (m as any).isAdditionalCharge);
+
       const pdfData = {
         invoiceNo: fullInvoice.invoiceNo,
-        poNo: null,
+        poNo: fullInvoice.poNo || null,
         date: fullInvoice.date,
-        poDate: null,
-        vehicleNo: vehicleNo,
+        poDate: fullInvoice.poDate || null,
+        vehicleNo: fullInvoice.vehicleNo || vehicleNo,
         customerName: fullInvoice.customerName || fullInvoice.company?.name || '',
         customerAddress: fullInvoice.billedTo || '',
         customerGst: fullInvoice.gstNo || fullInvoice.company?.gstNumber || '',
         description: fullInvoice.description || '',
-        items: (fullInvoice.invoiceMaterials && fullInvoice.invoiceMaterials.length > 0)
-          ? fullInvoice.invoiceMaterials.map(m => ({
+        items: materials.length > 0
+          ? materials.map(m => ({
             description: (m as any).description || '',
+            materialName: m.materialName,
             manifestNo: (m as any).manifestNo || '',
             hsnCode: '999432',
             quantity: m.quantity,
@@ -179,6 +186,7 @@ export default function Invoices() {
         additionalChargesQuantity: fullInvoice.additionalChargesQuantity || 0,
         additionalChargesRate: fullInvoice.additionalChargesRate || 0,
         additionalChargesUnit: fullInvoice.additionalChargesUnit || '',
+        additionalChargesList: additionalChargesList,
         grandTotal: fullInvoice.grandTotal
       };
 
@@ -198,6 +206,16 @@ export default function Invoices() {
   };
 
   const columns = [
+    {
+      key: "srNo",
+      header: "Sr No.",
+      render: (_: Invoice, index: number) => (
+        <span className="text-muted-foreground font-medium">
+          {(currentPage - 1) * pageSize + index + 1}
+        </span>
+      ),
+      className: "w-16",
+    },
     {
       key: "invoiceNo",
       header: "Invoice No.",
@@ -469,6 +487,7 @@ export default function Invoices() {
           totalPages={pagination.totalPages}
           onPageChange={(page) => setCurrentPage(page)}
           isLoading={isLoading || isFetching}
+          maxHeight="400px"
         />
       )}
 

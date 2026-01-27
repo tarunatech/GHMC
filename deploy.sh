@@ -1,28 +1,41 @@
 #!/bin/bash
 
-# --- GHMC Production Deployment Script ---
+# --- GHMC Production Deployment Script (Enhanced) ---
 # Run this on your Hostinger VPS AFTER pushing changes to GitHub.
+
+# Exit immediately if a command exits with a non-zero status.
+set -e
 
 echo "🚀 Starting Deployment Process..."
 
 # 1. Pull the latest changes from GitHub
-echo "📥 Pulling latest code from GitHub..."
+echo "📥 1/3: Pulling latest code from GitHub..."
 git pull origin main
 
 # 2. Update Backend
-echo "⚙️ Updating Backend..."
+echo "⚙️ 2/3: Updating Backend & Database..."
 cd backend
 npm install
-# Note: Prisma migrations are usually skiped if schema hasn't changed, 
-# but if you changed the schema, run: npx prisma db push
-pm2 restart ghmccrm-api
+
+# Apply database changes and regenerate Prisma client
+echo "🗄️ Synchronizing Database Schema..."
+npx prisma db push
+npx prisma generate
+
+# Restart the API service
+echo "🔄 Restarting API service..."
+pm2 restart ghmccrm-api || pm2 start src/server.js --name ghmccrm-api
 
 # 3. Update Frontend
-echo "🏗️ Building Frontend..."
+echo "🏗️ 3/3: Building Frontend..."
 cd ../frontend
 npm install
-# Ensure environment variables are correctly set (usually handled by .env.production)
+
+# Build the production bundle
+echo "🔨 Running build script..."
 npm run build
 
+echo "✅ -------------------------------------------"
 echo "✅ Deployment Successful!"
 echo "🌐 Your site is live at https://ghmccrm.in"
+echo "✅ -------------------------------------------"

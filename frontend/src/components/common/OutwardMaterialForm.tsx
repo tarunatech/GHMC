@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { roundToTwoDecimals } from "@/utils/validation";
 
 interface Props {
     onCancel: () => void;
@@ -144,7 +145,17 @@ export default function OutwardMaterialForm({ onCancel, onSubmit, entry, outward
             alert('Please select a transporter');
             return;
         }
-        onSubmit(formData);
+        const roundedData = {
+            ...formData,
+            quantity: roundToTwoDecimals(formData.quantity),
+            vehicleCapacity: roundToTwoDecimals(formData.vehicleCapacity),
+            rate: roundToTwoDecimals(formData.rate),
+            amount: roundToTwoDecimals(formData.amount),
+            detCharges: roundToTwoDecimals(formData.detCharges),
+            gst: roundToTwoDecimals(formData.gst),
+            grossAmount: roundToTwoDecimals(formData.grossAmount),
+        };
+        onSubmit(roundedData as any);
     };
 
     return (
@@ -245,7 +256,7 @@ export default function OutwardMaterialForm({ onCancel, onSubmit, entry, outward
                     >
                         <option value="">Select Unit</option>
                         <option value="MT">MT</option>
-                        <option value="Kg">Kg</option>
+                        <option value="KG">KG</option>
                         <option value="KL">KL</option>
                     </select>
                 </div>
@@ -280,10 +291,11 @@ export default function OutwardMaterialForm({ onCancel, onSubmit, entry, outward
                 <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">Vehicle Capacity</label>
                     <input
-                        type="text"
+                        type="number"
+                        step="0.01"
                         className="input-field w-full"
                         value={formData.vehicleCapacity || ''}
-                        onChange={(e) => setFormData({ ...formData, vehicleCapacity: e.target.value || undefined })}
+                        onChange={(e) => setFormData({ ...formData, vehicleCapacity: e.target.value === '' ? undefined : e.target.value })}
                     />
                 </div>
             </div>

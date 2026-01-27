@@ -13,7 +13,17 @@ import { format } from "date-fns";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
 import { isValidEmail, isValidPhone, isValidGST, formatPhoneNumber, formatGSTNumber } from "@/utils/validation";
 import { exportToCSV, formatCurrencyForExport } from "@/utils/export";
+import { getErrorMessage, logError } from "@/utils/errorHandler";
 import { useAuth } from "@/contexts/AuthContext";
+
+// Helper to normalize unit for backend (backend expects 'Kg' not 'KG')
+const normalizeUnitForBackend = (unit: string): 'MT' | 'Kg' | 'KL' => {
+  const upper = unit.toUpperCase();
+  if (upper === 'KG' || upper === 'KGS') return 'Kg';
+  if (upper === 'MT' || upper === 'MTS') return 'MT';
+  if (upper === 'KL' || upper === 'KLS') return 'KL';
+  return unit as 'MT' | 'Kg' | 'KL';
+};
 
 export default function Companies() {
   const queryClient = useQueryClient();
@@ -72,7 +82,8 @@ export default function Companies() {
       handleCloseModal();
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to create company');
+      logError('Creating company', error);
+      toast.error(getErrorMessage(error, 'Failed to create company'));
     },
   });
 
@@ -83,9 +94,9 @@ export default function Companies() {
       await companiesService.updateCompany(data.id, data.companyData);
 
       // 2. Handle Materials
-      // We need to fetch current materials to compare? Or the parent component passed them.
-      // Better: assume formData materials are the source of truth.
-      // We will blindly sync current formData materials.
+      // Only sync materials if user is admin/superadmin
+      const isAdmin = ['admin', 'superadmin'].includes(user?.role || '');
+      if (!isAdmin) return;
 
       // Fetch fresh existing materials to diff
       const existingMaterials = await companiesService.getCompanyMaterials(data.id);
@@ -107,7 +118,7 @@ export default function Companies() {
           await companiesService.updateMaterial(data.id, m.id, {
             material: m.material,
             rate: Number(m.rate),
-            unit: m.unit
+            unit: normalizeUnitForBackend(m.unit) // Normalize to match backend validation
           });
         } else {
           // Add new
@@ -116,7 +127,7 @@ export default function Companies() {
             await companiesService.addMaterial(data.id, {
               material: m.material,
               rate: Number(m.rate),
-              unit: m.unit
+              unit: normalizeUnitForBackend(m.unit) // Normalize to match backend validation
             });
           }
         }
@@ -131,7 +142,10 @@ export default function Companies() {
       handleCloseModal();
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to update company');
+      logError('Updating company', error);
+      const isAdmin = ['admin', 'superadmin'].includes(user?.role || '');
+      const baseMessage = getErrorMessage(error, 'Failed to update company');
+      toast.error(!isAdmin ? `${baseMessage} (Note: Employees cannot edit materials)` : baseMessage);
     },
   });
 
@@ -146,7 +160,8 @@ export default function Companies() {
       toast.success('Company deleted successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to delete company');
+      logError('Deleting company', error);
+      toast.error(getErrorMessage(error, 'Failed to delete company'));
     },
   });
 
@@ -220,17 +235,20 @@ export default function Companies() {
       return;
     }
 
-    const validMaterials = formData.materials
-      .filter(m => m.material.trim() && m.rate.toString().trim() && m.unit) // Ensure checks work on numbers too if rate is number
-      .map(m => ({
-        id: m.id,
-        material: m.material.trim(),
-        rate: parseFloat(m.rate as string) || 0,
-        unit: m.unit
-      }));
+    const isAdmin = ['admin', 'superadmin'].includes(user?.role || '');
+    const validMaterials = isAdmin
+      ? formData.materials
+        .filter(m => m.material.trim() && m.rate.toString().trim() && m.unit)
+        .map(m => ({
+          id: m.id,
+          material: m.material.trim(),
+          rate: parseFloat(m.rate as string) || 0,
+          unit: normalizeUnitForBackend(m.unit) // Normalize to match backend validation
+        }))
+      : [];
 
     // Only validate materials for admins
-    if (user?.role === 'admin' && validMaterials.length === 0) {
+    if (isAdmin && validMaterials.length === 0) {
       toast.error("Please add at least one material with rate and unit");
       return;
     }
@@ -258,6 +276,7 @@ export default function Companies() {
 
   const handleEdit = (company: Company) => {
     setEditingId(company.id);
+    const isAdmin = ['admin', 'superadmin'].includes(user?.role || '');
     setFormData({
       name: company.name,
       gstNumber: company.gstNumber || "",
@@ -265,11 +284,11 @@ export default function Companies() {
       city: company.city || "",
       contact: company.contact || "",
       email: company.email || "",
-      materials: company.materials && company.materials.length > 0
+      materials: isAdmin && company.materials && company.materials.length > 0
         ? company.materials.map(m => ({
           id: m.id, // Store ID for updates
           material: m.materialName,
-          rate: m.rate.toString(),
+          rate: (m.rate ?? "").toString(),
           unit: m.unit as any
         }))
         : [{ id: "", material: "", rate: "", unit: "Kg" }]
@@ -307,6 +326,16 @@ export default function Companies() {
   const totalPending = statsData?.totalPending || 0;
 
   const columns = [
+    {
+      key: "srNo",
+      header: "Sr No.",
+      render: (_: Company, index: number) => (
+        <span className="text-muted-foreground font-medium">
+          {(currentPage - 1) * pageSize + index + 1}
+        </span>
+      ),
+      className: "w-16",
+    },
     {
       key: "name",
       header: "Company Name",
@@ -539,6 +568,7 @@ export default function Companies() {
           totalPages={pagination.totalPages}
           onPageChange={(page) => setCurrentPage(page)}
           isLoading={isLoading || isFetching}
+          maxHeight="400px"
         />
       )}
 
@@ -677,8 +707,8 @@ export default function Companies() {
                           onChange={(e) => handleMaterialChange(index, 'unit', e.target.value as "MT" | "Kg" | "KL")}
                           required
                         >
-                          <option value="Kg">Kg</option>
                           <option value="MT">MT</option>
+                          <option value="Kg">KG</option>
                           <option value="KL">KL</option>
                         </select>
                       </div>
@@ -850,9 +880,9 @@ function CompanyDetails({ id }: { id: string }) {
       {user?.role === 'admin' && (
         <div>
           <h4 className="text-sm font-medium text-foreground mb-3">Invoice History</h4>
-          <div className="overflow-x-auto rounded-xl border border-border shadow-sm">
+          <div className="overflow-x-auto overflow-y-auto max-h-[300px] rounded-xl border border-border shadow-sm">
             <table className="w-full text-sm text-left">
-              <thead className="text-xs text-muted-foreground uppercase bg-secondary/50">
+              <thead className="text-xs text-muted-foreground uppercase bg-secondary/50 sticky top-0 z-[5]">
                 <tr>
                   <th className="px-4 py-3 font-semibold">Date</th>
                   <th className="px-4 py-3 font-semibold">Invoice No.</th>

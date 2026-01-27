@@ -17,8 +17,9 @@ import { format } from "date-fns";
 import CreateInvoiceModal from "@/components/common/CreateInvoiceModal";
 import InwardMaterialForm from "@/components/common/InwardMaterialForm";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { isNotFutureDate, isValidManifestNumber, isPositiveNumber } from "@/utils/validation";
+import { isNotFutureDate, isValidManifestNumber, isPositiveNumber, roundToTwoDecimals } from "@/utils/validation";
 import { exportToCSV, formatDateForExport, formatCurrencyForExport } from "@/utils/export";
+import { getErrorMessage, logError } from "@/utils/errorHandler";
 import { useAuth } from "@/contexts/AuthContext";
 import {
   DropdownMenu,
@@ -47,6 +48,8 @@ export default function Inward() {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [displayedEntriesCount, setDisplayedEntriesCount] = useState(4);
+  const [displayedMaterialsCount, setDisplayedMaterialsCount] = useState(4);
 
 
 
@@ -102,10 +105,8 @@ export default function Inward() {
       setIsModalOpen(false);
     },
     onError: (error: any) => {
-      console.error('Create Entry Error:', error);
-      const message = error.response?.data?.error?.message || error.response?.statusText || 'Failed to create entry';
-      const details = error.response?.data?.error?.details?.[0]?.message; // Show first validation error if available
-      toast.error(details ? `${message}: ${details}` : message);
+      logError('Creating inward entry', error);
+      toast.error(getErrorMessage(error, 'Failed to create entry'));
     },
   });
 
@@ -123,7 +124,8 @@ export default function Inward() {
       setEditingEntry(null);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to update entry');
+      logError('Updating inward entry', error);
+      toast.error(getErrorMessage(error, 'Failed to update entry'));
     },
   });
 
@@ -139,7 +141,8 @@ export default function Inward() {
       toast.success('Entry deleted successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to delete entry');
+      logError('Deleting inward entry', error);
+      toast.error(getErrorMessage(error, 'Failed to delete entry'));
     },
   });
 
@@ -169,7 +172,8 @@ export default function Inward() {
       setIsMaterialModalOpen(false);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to create material record');
+      logError('Creating inward material', error);
+      toast.error(getErrorMessage(error, 'Failed to create material record'));
     },
   });
 
@@ -183,7 +187,8 @@ export default function Inward() {
       setEditingMaterial(null);
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to update material record');
+      logError('Updating inward material', error);
+      toast.error(getErrorMessage(error, 'Failed to update material record'));
     },
   });
 
@@ -195,7 +200,8 @@ export default function Inward() {
       toast.success('Material record deleted successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to delete material record');
+      logError('Deleting inward material', error);
+      toast.error(getErrorMessage(error, 'Failed to delete material record'));
     },
   });
 
@@ -265,7 +271,7 @@ export default function Inward() {
   }, []);
 
   const columns = useMemo(() => [
-    { key: "srNo", header: "Sr No.", render: (e: InwardEntry) => e.srNo || '-' },
+    { key: "srNo", header: "Sr No.", render: (_: InwardEntry, index: number) => <span>{index + 1}</span> },
     { key: "date", header: "Date", render: (e: InwardEntry) => format(new Date(e.date), 'dd MMM yyyy') },
     { key: "month", header: "Month", render: (e: InwardEntry) => e.month || '-' },
     { key: "lotNo", header: "Lot No.", render: (e: InwardEntry) => e.lotNo || '-' },
@@ -690,6 +696,7 @@ export default function Inward() {
           totalPages={pagination.totalPages}
           onPageChange={(page) => setCurrentPage(page)}
           isLoading={isLoading || isFetching}
+          maxHeight="400px"
         />
       )}
 
@@ -700,69 +707,73 @@ export default function Inward() {
             <h2 className="text-xl font-semibold text-foreground">Inward Transporter Records</h2>
             <p className="text-sm text-muted-foreground">Manage transporter invoices and payments</p>
           </div>
-          {user?.role === 'superadmin' && (
+          {user?.role !== 'admin' && (
             <Button onClick={() => setIsMaterialModalOpen(true)}>
               <Plus className="w-4 h-4 mr-2" /> Add Material Record
             </Button>
           )}
         </div>
 
-        <DataTable
-          columns={[
-            { key: "date", header: "Date", render: (m: InwardMaterial) => m.date ? format(new Date(m.date), 'dd MMM yyyy') : '-' },
-            { key: "month", header: "Month", render: (m: any) => m.month || m.inwardEntry?.month || '-' }, // month might be on linked entry or direct
-            { key: "transporterName", header: "Transporter" },
-            { key: "lotNo", header: "Lot No.", render: (m: InwardMaterial) => m.lotNo || '-' },
-            { key: "manifestNo", header: "Manifest No.", render: (m: InwardMaterial) => m.manifestNo || '-' },
-            { key: 'vehicleNo', header: 'Vehicle No.', render: (m: InwardMaterial) => m.vehicleNo || '-' },
-            { key: "wasteName", header: "Waste Name", render: (m: InwardMaterial) => m.wasteName || '-' },
-            { key: "category", header: "Category", render: (m: InwardMaterial) => m.category || '-' },
-            { key: "quantity", header: "Quantity", render: (m: InwardMaterial) => m.quantity ? `${m.quantity} ${m.unit || ''}` : '-' },
-            { key: "vehicleCapacity", header: "Vehicle Capacity", render: (m: InwardMaterial) => m.vehicleCapacity || '-' },
-            ...(user?.role === 'admin' || user?.role === 'superadmin' ? [
-              { key: "rate", header: "Rate", render: (m: InwardMaterial) => (m.rate !== null && m.rate !== undefined) ? `₹${Number(m.rate).toFixed(2)}` : '-' },
-              { key: "amount", header: "Amount", render: (m: InwardMaterial) => (m.amount !== null && m.amount !== undefined) ? `₹${Number(m.amount).toFixed(2)}` : '-' },
-              { key: "detCharges", header: "Det. Charges", render: (m: InwardMaterial) => (m.detCharges !== null && m.detCharges !== undefined) ? `₹${Number(m.detCharges).toFixed(2)}` : '-' },
-              { key: "gst", header: "GST", render: (m: InwardMaterial) => (m.gst !== null && m.gst !== undefined) ? `₹${Number(m.gst).toFixed(2)}` : '-' },
-              { key: "grossAmount", header: "Gross Amount", render: (m: InwardMaterial) => (m.grossAmount !== null && m.grossAmount !== undefined) ? `₹${Number(m.grossAmount).toFixed(2)}` : '-' },
-              { key: "invoiceNo", header: "Invoice No.", render: (m: InwardMaterial) => m.invoiceNo || '-' },
-              { key: "paidOn", header: "Paid On", render: (m: InwardMaterial) => m.paidOn ? format(new Date(m.paidOn), 'dd MMM yyyy') : '-' },
-            ] : []),
-            {
-              key: "actions",
-              header: "Actions",
-              render: (m: InwardMaterial) => (
-                <div className="flex items-center gap-2">
-                  {user?.role === 'superadmin' && (
-                    <>
-                      <button
-                        onClick={() => {
-                          setEditingMaterial(m);
-                          setIsMaterialModalOpen(true);
-                        }}
-                        className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
-                        title="Edit"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteMaterial(m.id)}
-                        disabled={deleteMaterialMutation.isPending}
-                        className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              ),
-            },
-          ]}
-          data={materials}
-          keyExtractor={(material) => material.id}
-          emptyMessage="No material records found"
-        />
+        <div className="space-y-4">
+          <DataTable
+            columns={[
+              { key: "srNo", header: "Sr No.", render: (_: any, index: number) => index + 1, className: "w-16" },
+              { key: "date", header: "Date", render: (m: InwardMaterial) => m.date ? format(new Date(m.date), 'dd MMM yyyy') : '-' },
+              { key: "month", header: "Month", render: (m: any) => m.month || m.inwardEntry?.month || '-' }, // month might be on linked entry or direct
+              { key: "transporterName", header: "Transporter" },
+              { key: "lotNo", header: "Lot No.", render: (m: InwardMaterial) => m.lotNo || '-' },
+              { key: "manifestNo", header: "Manifest No.", render: (m: InwardMaterial) => m.manifestNo || '-' },
+              { key: 'vehicleNo', header: 'Vehicle No.', render: (m: InwardMaterial) => m.vehicleNo || '-' },
+              { key: "wasteName", header: "Waste Name", render: (m: InwardMaterial) => m.wasteName || '-' },
+              { key: "category", header: "Category", render: (m: InwardMaterial) => m.category || '-' },
+              { key: "quantity", header: "Quantity", render: (m: InwardMaterial) => m.quantity ? `${m.quantity} ${m.unit || ''}` : '-' },
+              { key: "vehicleCapacity", header: "Vehicle Capacity", render: (m: InwardMaterial) => m.vehicleCapacity || '-' },
+              ...(user?.role === 'admin' || user?.role === 'superadmin' ? [
+                { key: "rate", header: "Rate", render: (m: InwardMaterial) => (m.rate !== null && m.rate !== undefined) ? `₹${Number(m.rate).toFixed(2)}` : '-' },
+                { key: "amount", header: "Amount", render: (m: InwardMaterial) => (m.amount !== null && m.amount !== undefined) ? `₹${Number(m.amount).toFixed(2)}` : '-' },
+                { key: "detCharges", header: "Det. Charges", render: (m: InwardMaterial) => (m.detCharges !== null && m.detCharges !== undefined) ? `₹${Number(m.detCharges).toFixed(2)}` : '-' },
+                { key: "gst", header: "GST", render: (m: InwardMaterial) => (m.gst !== null && m.gst !== undefined) ? `₹${Number(m.gst).toFixed(2)}` : '-' },
+                { key: "grossAmount", header: "Gross Amount", render: (m: InwardMaterial) => (m.grossAmount !== null && m.grossAmount !== undefined) ? `₹${Number(m.grossAmount).toFixed(2)}` : '-' },
+                { key: "invoiceNo", header: "Invoice No.", render: (m: InwardMaterial) => m.invoiceNo || '-' },
+                { key: "paidOn", header: "Paid On", render: (m: InwardMaterial) => m.paidOn ? format(new Date(m.paidOn), 'dd MMM yyyy') : '-' },
+              ] : []),
+              {
+                key: "actions",
+                header: "Actions",
+                render: (m: InwardMaterial) => (
+                  <div className="flex items-center gap-2">
+                    {user?.role !== 'admin' && (
+                      <>
+                        <button
+                          onClick={() => {
+                            setEditingMaterial(m);
+                            setIsMaterialModalOpen(true);
+                          }}
+                          className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                          title="Edit"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteMaterial(m.id)}
+                          disabled={deleteMaterialMutation.isPending}
+                          className="p-2 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-50"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ),
+              },
+            ]}
+            data={materials}
+            keyExtractor={(material) => material.id}
+            emptyMessage="No material records found"
+            maxHeight="400px"
+          />
+        </div>
       </div>
 
       {/* Create Entry Modal */}
@@ -915,7 +926,12 @@ function InwardEntryForm({ companies, entry, onCancel, onSubmit, isLoading }: an
       return;
     }
 
-    onSubmit(formData);
+    const roundedData = {
+      ...formData,
+      quantity: roundToTwoDecimals(formData.quantity),
+      rate: roundToTwoDecimals(formData.rate),
+    };
+    onSubmit(roundedData);
   };
 
   // Get selected company to access its materials
@@ -1132,6 +1148,9 @@ function InwardEntryDetails({ entry }: { entry: InwardEntry }) {
       setIsDownloading(true);
       const invoiceData = await invoicesService.getInvoiceById(entry.invoice.id);
 
+      const materials = (invoiceData.invoiceMaterials || []).filter(m => !(m as any).isAdditionalCharge);
+      const additionalChargesList = (invoiceData.invoiceMaterials || []).filter(m => (m as any).isAdditionalCharge);
+
       const pdfData = {
         invoiceNo: invoiceData.invoiceNo,
         poNo: null,
@@ -1142,10 +1161,11 @@ function InwardEntryDetails({ entry }: { entry: InwardEntry }) {
         customerAddress: invoiceData.billedTo || '',
         customerGst: invoiceData.gstNo || entry.company?.gstNumber || '',
         description: invoiceData.description || '',
-        items: (invoiceData.invoiceMaterials && invoiceData.invoiceMaterials.length > 0)
-          ? invoiceData.invoiceMaterials.map(m => ({
+        items: materials.length > 0
+          ? materials.map(m => ({
             description: (m as any).description || '',
             manifestNo: (m as any).manifestNo || '',
+            materialName: m.materialName,
             hsnCode: '999432',
             quantity: m.quantity,
             unit: m.unit,
@@ -1171,6 +1191,7 @@ function InwardEntryDetails({ entry }: { entry: InwardEntry }) {
         additionalChargesQuantity: invoiceData.additionalChargesQuantity || 0,
         additionalChargesRate: invoiceData.additionalChargesRate || 0,
         additionalChargesUnit: invoiceData.additionalChargesUnit || '',
+        additionalChargesList: additionalChargesList,
         grandTotal: invoiceData.grandTotal
       };
 
@@ -1258,9 +1279,9 @@ function InwardEntryDetails({ entry }: { entry: InwardEntry }) {
       <div>
         <h4 className="font-medium text-foreground mb-3">Transporter Records</h4>
         {entry.inwardMaterials && entry.inwardMaterials.length > 0 ? (
-          <div className="overflow-x-auto rounded-xl border border-border">
+          <div className="overflow-x-auto overflow-y-auto max-h-[300px] rounded-xl border border-border">
             <table className="w-full text-sm text-left">
-              <thead className="bg-secondary/50 text-muted-foreground uppercase text-xs">
+              <thead className="bg-secondary/50 text-muted-foreground uppercase text-xs sticky top-0 z-[5]">
                 <tr>
                   <th className="px-4 py-2 font-semibold">Transporter</th>
                   <th className="px-4 py-2 font-semibold">Vehicle No</th>

@@ -14,6 +14,9 @@ const router = express.Router();
 // Get all inward entries
 router.get('/', authenticate, inwardController.getAllEntries.bind(inwardController));
 
+// Get statistics
+router.get('/stats/all', authenticate, inwardController.getStats.bind(inwardController));
+
 // Get inward entry by ID
 router.get('/:id', authenticate, inwardController.getEntryById.bind(inwardController));
 
@@ -21,7 +24,7 @@ router.get('/:id', authenticate, inwardController.getEntryById.bind(inwardContro
 router.post(
   '/',
   authenticate,
-  authorize(['superadmin', 'employee']),
+  authorize(['superadmin', 'admin', 'employee']),
   validate(createInwardEntrySchema),
   inwardController.createEntry.bind(inwardController)
 );
@@ -30,19 +33,16 @@ router.post(
 router.put(
   '/:id',
   authenticate,
-  authorize(['superadmin', 'employee']),
+  authorize(['superadmin', 'admin', 'employee']),
   validate(updateInwardEntrySchema),
   inwardController.updateEntry.bind(inwardController)
 );
 
 // Delete inward entry
-router.delete('/:id', authenticate, authorize(['superadmin', 'employee']), inwardController.deleteEntry.bind(inwardController));
+router.delete('/:id', authenticate, authorize(['superadmin', 'admin', 'employee']), inwardController.deleteEntry.bind(inwardController));
 
 // Update payment
-router.put('/:id/payment', authenticate, authorize(['superadmin', 'employee']), inwardController.updatePayment.bind(inwardController));
-
-// Get statistics
-router.get('/stats/all', authenticate, inwardController.getStats.bind(inwardController));
+router.put('/:id/payment', authenticate, authorize(['superadmin', 'admin', 'employee']), inwardController.updatePayment.bind(inwardController));
 
 // Note: /stats/all is used to avoid conflict with /:id route
 

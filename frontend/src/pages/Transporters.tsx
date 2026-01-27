@@ -12,6 +12,7 @@ import transportersService, { Transporter, CreateTransporterData, UpdateTranspor
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
+import { getErrorMessage, logError } from "@/utils/errorHandler";
 
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -68,7 +69,8 @@ export default function Transporters() {
       handleCloseModal();
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to create transporter');
+      logError('Creating transporter', error);
+      toast.error(getErrorMessage(error, 'Failed to create transporter'));
     },
   });
 
@@ -82,7 +84,8 @@ export default function Transporters() {
       handleCloseModal();
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to update transporter');
+      logError('Updating transporter', error);
+      toast.error(getErrorMessage(error, 'Failed to update transporter'));
     },
   });
 
@@ -95,7 +98,8 @@ export default function Transporters() {
       toast.success('Transporter deleted successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.error?.message || 'Failed to delete transporter');
+      logError('Deleting transporter', error);
+      toast.error(getErrorMessage(error, 'Failed to delete transporter'));
     },
   });
 
@@ -202,6 +206,16 @@ export default function Transporters() {
   const totalPending = statsData?.totalPending || 0;
 
   const columns = [
+    {
+      key: "srNo",
+      header: "Sr No.",
+      render: (_: Transporter, index: number) => (
+        <span className="text-muted-foreground font-medium">
+          {(currentPage - 1) * pageSize + index + 1}
+        </span>
+      ),
+      className: "w-16",
+    },
     {
       key: "name",
       header: "Transporter Name",
@@ -387,6 +401,7 @@ export default function Transporters() {
           totalPages={pagination.totalPages}
           onPageChange={(page) => setCurrentPage(page)}
           isLoading={isLoading || isFetching}
+          maxHeight="400px"
         />
       )}
 
@@ -596,6 +611,7 @@ function TransporterDetails({ id }: { id: string }) {
             data={transporter.inwardHistory || []}
             keyExtractor={(m) => m.id}
             emptyMessage="No inward transport records found"
+            maxHeight="400px"
           />
         </div>
 
@@ -616,6 +632,7 @@ function TransporterDetails({ id }: { id: string }) {
             data={transporter.outwardHistory || []}
             keyExtractor={(m) => m.id}
             emptyMessage="No outward transport records found"
+            maxHeight="400px"
           />
         </div>
       </div>

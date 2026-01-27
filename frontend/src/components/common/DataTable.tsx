@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 interface Column<T> {
   key: keyof T | string;
   header: string;
-  render?: (item: T) => ReactNode;
+  render?: (item: T, index: number) => ReactNode;
   className?: string;
 }
 
@@ -17,6 +17,7 @@ interface DataTableProps<T> {
   onPageChange?: (page: number) => void;
   emptyMessage?: string;
   isLoading?: boolean;
+  maxHeight?: string; // e.g., "400px" for vertical scrolling
 }
 
 import { Loader2 } from "lucide-react";
@@ -30,6 +31,7 @@ export function DataTable<T>({
   onPageChange,
   emptyMessage = "No data available",
   isLoading = false,
+  maxHeight,
 }: DataTableProps<T>) {
   return (
     <div className="glass-card overflow-hidden relative">
@@ -40,9 +42,12 @@ export function DataTable<T>({
           </div>
         </div>
       )}
-      <div className="overflow-x-auto">
+      <div
+        className="overflow-x-auto overflow-y-auto"
+        style={maxHeight ? { maxHeight } : undefined}
+      >
         <table className="data-table">
-          <thead>
+          <thead className={maxHeight ? "sticky top-0 z-[5] bg-card" : ""}>
             <tr>
               {columns.map((column, index) => (
                 <th key={`${String(column.key)}-${index}`} className={column.className}>
@@ -59,12 +64,12 @@ export function DataTable<T>({
                 </td>
               </tr>
             ) : (
-              data.map((item) => (
+              data.map((item, idx) => (
                 <tr key={keyExtractor(item)}>
-                  {columns.map((column, index) => (
-                    <td key={`${String(column.key)}-${index}`} className={column.className}>
+                  {columns.map((column, colIdx) => (
+                    <td key={`${String(column.key)}-${colIdx}`} className={column.className}>
                       {column.render
-                        ? column.render(item)
+                        ? column.render(item, idx)
                         : String((item as Record<string, unknown>)[column.key as string] ?? "")}
                     </td>
                   ))}

@@ -10,7 +10,7 @@ import { logger } from '../utils/logger.js';
  */
 
 const DEFAULT_EMPLOYEE = {
-    email: 'employee@chemwaste.com',
+    email: 'employee@ghmcwest.com',
     password: 'employee123',
     fullName: 'Employee User',
     role: 'employee',
