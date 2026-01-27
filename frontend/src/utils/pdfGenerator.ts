@@ -141,14 +141,17 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   doc.text(invoiceData.customerName || '', midX + 2, addressY + 10);
 
   doc.setFont('helvetica', 'normal');
-  const addressLines = doc.splitTextToSize(invoiceData.customerAddress || 'Address not provided', 90);
+  const customerAddress = invoiceData.customerAddress || 'Address not provided';
+  const addressLines = doc.splitTextToSize(customerAddress, 90);
   doc.text(addressLines, 12, addressY + 15);
   doc.text(addressLines, midX + 2, addressY + 15);
 
-  // GSTIN for customer
+  // GSTIN for customer (Positioned dynamically below address)
   if (invoiceData.customerGst) {
+    const addressHeight = addressLines.length * 4.5; // Approximate line height
+    const gstinY = addressY + 15 + addressHeight + 2;
     doc.setFont('helvetica', 'bold');
-    doc.text(`GSTIN: ${invoiceData.customerGst}`, 12, addressY + 25);
+    doc.text(`GSTIN: ${invoiceData.customerGst}`, 12, gstinY);
   }
 
   // Box for Billed/Shipped
