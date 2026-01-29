@@ -119,6 +119,7 @@ export interface CreateInwardMaterialData {
 export interface InwardStats {
   totalEntries: number;
   totalQuantity: number;
+  unit: string;
   totalInvoiced: number;
   totalReceived: number;
 }

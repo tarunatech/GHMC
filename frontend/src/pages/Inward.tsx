@@ -149,7 +149,7 @@ export default function Inward() {
   const entries = data?.entries || [];
   const pagination = data?.pagination || { page: 1, limit: 20, total: 0, totalPages: 1, hasNext: false, hasPrev: false };
   const companies = companiesData?.companies || [];
-  const stats = statsData || { totalEntries: 0, totalQuantity: 0, totalInvoiced: 0, totalReceived: 0 };
+  const stats = statsData || { totalEntries: 0, totalQuantity: 0, unit: 'MT', totalInvoiced: 0, totalReceived: 0 };
   const materials = materialsData?.materials || [];
 
   // Reset to page 1 when search changes
@@ -663,17 +663,23 @@ export default function Inward() {
         </div>
         <div className="glass-card p-4">
           <p className="text-sm text-muted-foreground">Total Quantity</p>
-          <p className="text-xl md:text-2xl font-bold text-foreground mt-1">{stats.totalQuantity.toFixed(1)}</p>
+          <p className="text-xl md:text-2xl font-bold text-foreground mt-1">
+            {stats.totalQuantity.toFixed(1)} {stats.unit || 'MT'}
+          </p>
         </div>
         {['admin', 'superadmin'].includes(user?.role || '') && (
           <>
             <div className="glass-card p-4">
               <p className="text-sm text-muted-foreground">Invoiced Amount</p>
-              <p className="text-xl md:text-2xl font-bold text-foreground mt-1">₹{stats.totalInvoiced.toLocaleString()}</p>
+              <p className="text-xl md:text-2xl font-bold text-foreground mt-1">
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(stats.totalInvoiced)}
+              </p>
             </div>
             <div className="glass-card p-4">
               <p className="text-sm text-muted-foreground">Payment Received</p>
-              <p className="text-xl md:text-2xl font-bold text-success mt-1">₹{stats.totalReceived.toLocaleString()}</p>
+              <p className="text-xl md:text-2xl font-bold text-success mt-1">
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(stats.totalReceived)}
+              </p>
             </div>
           </>
         )}

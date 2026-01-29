@@ -87,8 +87,8 @@ export default function Dashboard() {
   };
 
   // Format quantity for display
-  const formatQuantity = (quantity: number) => {
-    return `${quantity.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MT`;
+  const formatQuantity = (quantity: number, unit: string = "MT") => {
+    return `${quantity.toFixed(1)} ${unit}`;
   };
 
   // Prepare payment status data for pie chart
@@ -120,27 +120,27 @@ export default function Dashboard() {
           {/* Stats Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <StatCard
-              title="Total Inward (This Month)"
-              value={stats ? formatQuantity(stats.inward.quantity) : "0 MT"}
-              subtitle={`Across ${stats?.inward.entries || 0} entries`}
+              title="Total Inward Quantity"
+              value={stats ? formatQuantity(stats.inward.allTimeQuantity, stats.inward.allTimeUnit) : `0 MT`}
+              subtitle={`Across ${stats?.inward.allTimeEntries || 0} total entries`}
               icon={ArrowDownToLine}
             />
             <StatCard
-              title="Total Outward (This Month)"
-              value={stats ? formatQuantity(stats.outward.quantity) : "0 MT"}
-              subtitle={`Across ${stats?.outward.entries || 0} dispatches`}
+              title="Total Outward Quantity"
+              value={stats ? formatQuantity(stats.outward.allTimeQuantity, stats.outward.allTimeUnit) : `0 MT`}
+              subtitle={`Across ${stats?.outward.allTimeEntries || 0} total dispatches`}
               icon={ArrowUpFromLine}
             />
             <StatCard
               title="Inward Invoices"
-              value={stats?.invoices.thisMonth.toString() || "0"}
+              value={stats?.invoices?.thisMonth?.toString() || "0"}
               subtitle="Generated this month"
               icon={FileText}
             />
             <StatCard
               title="Total Inward Revenue (All Time)"
-              value={stats ? formatRevenue(stats.revenue.allTime) : "₹0"}
-              subtitle={`Paid: ${stats ? formatRevenue(stats.revenue.allTimePaid) : "₹0"} | Pending: ${stats ? formatRevenue(stats.revenue.allTimePending) : "₹0"}`}
+              value={stats ? formatRevenue(stats.revenue?.allTime || 0) : "₹0"}
+              subtitle={`Paid: ${stats ? formatRevenue(stats.revenue?.allTimePaid || 0) : "₹0"} | Pending: ${stats ? formatRevenue(stats.revenue?.allTimePending || 0) : "₹0"}`}
               icon={IndianRupee}
             />
           </div>

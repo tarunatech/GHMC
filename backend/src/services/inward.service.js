@@ -393,21 +393,40 @@ class InwardService {
    * @returns {Promise<object>} Statistics object
    */
   async getStats() {
-    // 1. Get basic aggregations (Count and Quantity)
-    const aggregations = await prisma.inwardEntry.aggregate({
-      _count: {
-        id: true,
-      },
-      _sum: {
+    // 1. Get all entries to calculate unit-aware quantity
+    const entries = await prisma.inwardEntry.findMany({
+      select: {
         quantity: true,
+        unit: true,
       },
     });
 
-    const totalEntries = aggregations._count.id;
-    const totalQuantity = Number(aggregations._sum.quantity) || 0;
+    const toMT = (quantity, unit) => {
+      const g = parseFloat(quantity || 0);
+      if (unit === 'MT') return g;
+      if (unit === 'Kg') return g / 1000;
+      if (unit === 'KL') return g;
+      return g;
+    };
 
-    // 2. Calculate Invoiced Value and Payment Received from UNIQUE invoices
-    // We strictly use the Invoice's Grand Total, as it is the source of truth for the bill (including extra charges)
+    let totalMT = 0;
+    let totalQuantityRaw = 0;
+    let allKg = entries.length > 0;
+
+    entries.forEach(e => {
+      const qty = parseFloat(e.quantity || 0);
+      totalMT += toMT(qty, e.unit);
+      totalQuantityRaw += qty;
+      if (e.unit !== 'Kg') allKg = false;
+    });
+
+    const totalQuantity = allKg && entries.length > 0 ? totalQuantityRaw : totalMT;
+    const unit = allKg && entries.length > 0 ? 'KG' : 'MT';
+
+    // 2. Count total entries
+    const totalEntries = entries.length;
+
+    // 3. Calculate Invoiced Value and Payment Received from UNIQUE invoices
     const distinctInvoices = await prisma.inwardEntry.findMany({
       where: {
         invoiceId: { not: null }
@@ -441,6 +460,7 @@ class InwardService {
     return {
       totalEntries,
       totalQuantity,
+      unit,
       totalInvoiced,
       totalReceived,
     };

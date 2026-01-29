@@ -16,29 +16,21 @@ class DashboardService {
     const startOfYear = new Date(now.getFullYear(), 0, 1);
 
     // Get current month inward stats
-    const [currentMonthInward, currentMonthOutward, totalInvoices, monthRevenue, allTimeRevenueStats] = await Promise.all([
-      prisma.inwardEntry.aggregate({
-        where: {
-          date: {
-            gte: startOfMonth,
-          },
-        },
-        _count: true,
-        _sum: {
-          quantity: true,
-        },
-      }),
-      prisma.outwardEntry.aggregate({
-        where: {
-          date: {
-            gte: startOfMonth,
-          },
-        },
-        _count: true,
-        _sum: {
-          quantity: true,
-        },
-      }),
+    // Helper function to convert to MT
+    const toMT = (quantity, unit) => {
+      const g = parseFloat(quantity || 0);
+      if (unit === 'MT') return g;
+      if (unit === 'Kg') return g / 1000;
+      if (unit === 'KL') return g; // Assuming KL ≈ MT
+      return g;
+    };
+
+    // Fetch entries for manual sum (more accurate than prisma aggregate when units are mixed)
+    const [monthInwardEntries, monthOutwardEntries, allInwardEntries, allOutwardEntries, totalInvoices, monthRevenue, allTimeRevenueStats] = await Promise.all([
+      prisma.inwardEntry.findMany({ where: { date: { gte: startOfMonth } }, select: { quantity: true, unit: true } }),
+      prisma.outwardEntry.findMany({ where: { date: { gte: startOfMonth } }, select: { quantity: true, unit: true } }),
+      prisma.inwardEntry.findMany({ select: { quantity: true, unit: true } }),
+      prisma.outwardEntry.findMany({ select: { quantity: true, unit: true } }),
       prisma.invoice.count({
         where: {
           type: 'Inward',
@@ -70,24 +62,32 @@ class DashboardService {
       }),
     ]);
 
-    // Get all-time totals for comparison
-    const [allTimeInward, allTimeOutward] = await Promise.all([
-      prisma.inwardEntry.aggregate({
-        _count: true,
-        _sum: {
-          quantity: true,
-        },
-      }),
-      prisma.outwardEntry.aggregate({
-        _count: true,
-        _sum: {
-          quantity: true,
-        },
-      }),
-    ]);
+    const calculateStats = (entries) => {
+      let totalMT = 0;
+      let allKg = entries.length > 0;
 
-    const totalInwardQuantity = parseFloat(currentMonthInward._sum.quantity || 0);
-    const totalOutwardQuantity = parseFloat(currentMonthOutward._sum.quantity || 0);
+      entries.forEach(e => {
+        totalMT += toMT(e.quantity, e.unit);
+        if (e.unit !== 'Kg') allKg = false;
+      });
+
+      // If all are Kg, return in Kg, otherwise MT
+      if (allKg && entries.length > 0) {
+        return {
+          quantity: entries.reduce((sum, e) => sum + parseFloat(e.quantity || 0), 0),
+          unit: 'KG'
+        };
+      }
+      return {
+        quantity: totalMT,
+        unit: 'MT'
+      };
+    };
+
+    const inMonthStats = calculateStats(monthInwardEntries);
+    const outMonthStats = calculateStats(monthOutwardEntries);
+    const inAllStats = calculateStats(allInwardEntries);
+    const outAllStats = calculateStats(allOutwardEntries);
 
     // Monthly stats
     const revenueTotal = parseFloat(monthRevenue._sum.grandTotal || 0);
@@ -101,16 +101,20 @@ class DashboardService {
 
     return {
       inward: {
-        entries: currentMonthInward._count,
-        quantity: totalInwardQuantity,
-        allTimeEntries: allTimeInward._count,
-        allTimeQuantity: parseFloat(allTimeInward._sum.quantity || 0),
+        entries: monthInwardEntries.length,
+        quantity: inMonthStats.quantity,
+        unit: inMonthStats.unit,
+        allTimeEntries: allInwardEntries.length,
+        allTimeQuantity: inAllStats.quantity,
+        allTimeUnit: inAllStats.unit,
       },
       outward: {
-        entries: currentMonthOutward._count,
-        quantity: totalOutwardQuantity,
-        allTimeEntries: allTimeOutward._count,
-        allTimeQuantity: parseFloat(allTimeOutward._sum.quantity || 0),
+        entries: monthOutwardEntries.length,
+        quantity: outMonthStats.quantity,
+        unit: outMonthStats.unit,
+        allTimeEntries: allOutwardEntries.length,
+        allTimeQuantity: outAllStats.quantity,
+        allTimeUnit: outAllStats.unit,
       },
       invoices: {
         thisMonth: totalInvoices,

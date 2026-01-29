@@ -99,8 +99,8 @@ export interface OutwardSummary {
 export interface OutwardStats {
   totalDispatches: number;
   totalQuantity: number;
+  unit: string;
   totalInvoiced: number;
-
   totalReceived: number;
 }
 

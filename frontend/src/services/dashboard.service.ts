@@ -4,14 +4,18 @@ export interface DashboardStats {
   inward: {
     entries: number;
     quantity: number;
+    unit: string;
     allTimeEntries: number;
     allTimeQuantity: number;
+    allTimeUnit: string;
   };
   outward: {
     entries: number;
     quantity: number;
+    unit: string;
     allTimeEntries: number;
     allTimeQuantity: number;
+    allTimeUnit: string;
   };
   invoices: {
     thisMonth: number;

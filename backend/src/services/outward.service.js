@@ -461,14 +461,32 @@ class OutwardService {
       },
     });
 
+    const toMT = (quantity, unit) => {
+      const g = parseFloat(quantity || 0);
+      if (unit === 'MT') return g;
+      if (unit === 'Kg') return g / 1000;
+      if (unit === 'KL') return g;
+      return g;
+    };
+
+    let totalMT = 0;
+    let totalQuantityRaw = 0;
+    let allKg = entries.length > 0;
+
+    entries.forEach(e => {
+      const qty = parseFloat(e.quantity || 0);
+      totalMT += toMT(qty, e.unit);
+      totalQuantityRaw += qty;
+      if (e.unit !== 'Kg') allKg = false;
+    });
+
+    const totalQuantity = allKg && entries.length > 0 ? totalQuantityRaw : totalMT;
+    const unit = allKg && entries.length > 0 ? 'KG' : 'MT';
+
     const totalDispatches = entries.length;
-    const totalQuantity = entries.reduce((sum, e) => sum + Number(e.quantity), 0);
 
     // Calculate invoiced and received
-    // Prioritize entry.grossAmount if available (reflects latest edits), otherwise fallback to invoice.grandTotal
     const totalInvoiced = entries.reduce((sum, e) => {
-      // If entry has a specific gross amount (from manual edit/calc), use it.
-      // Otherwise if it has a linked invoice, use that invoice's total.
       const amount = e.grossAmount ? Number(e.grossAmount) : (e.invoice ? Number(e.invoice.grandTotal) : 0);
       return sum + amount;
     }, 0);
@@ -480,6 +498,7 @@ class OutwardService {
     return {
       totalDispatches,
       totalQuantity,
+      unit,
       totalInvoiced,
       totalReceived,
     };
