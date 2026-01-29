@@ -17,9 +17,12 @@ export interface DashboardStats {
     thisMonth: number;
   };
   revenue: {
-    ytd: number;
-    paid: number;
-    pending: number;
+    thisMonth: number;
+    thisMonthPaid: number;
+    thisMonthPending: number;
+    allTime: number;
+    allTimePaid: number;
+    allTimePending: number;
   };
 }
 

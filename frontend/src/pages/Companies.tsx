@@ -376,13 +376,15 @@ export default function Companies() {
       {
         key: "totalInvoiced",
         header: "Total Invoiced",
-        render: (company: Company) => `₹${(company.totalInvoiced || 0).toLocaleString()}`,
+        render: (company: Company) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(company.totalInvoiced || 0),
       },
       {
         key: "totalPaid",
         header: "Total Paid",
         render: (company: Company) => (
-          <span className="text-success">₹{(company.totalPaid || 0).toLocaleString()}</span>
+          <span className="text-success">
+            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(company.totalPaid || 0)}
+          </span>
         ),
       },
       {
@@ -392,7 +394,7 @@ export default function Companies() {
           const pending = company.totalPending || 0;
           return (
             <span className={pending > 0 ? "text-destructive" : "text-success"}>
-              ₹{pending.toLocaleString()}
+              {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(pending)}
             </span>
           );
         },
@@ -531,19 +533,19 @@ export default function Companies() {
             <div className="glass-card p-4">
               <p className="text-sm text-muted-foreground">Total Invoiced</p>
               <p className="text-xl md:text-2xl font-bold text-foreground mt-1">
-                ₹{totalInvoiced.toLocaleString()}
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(totalInvoiced)}
               </p>
             </div>
             <div className="glass-card p-4">
               <p className="text-sm text-muted-foreground">Total Received</p>
               <p className="text-xl md:text-2xl font-bold text-success mt-1">
-                ₹{totalPaid.toLocaleString()}
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(totalPaid)}
               </p>
             </div>
             <div className="glass-card p-4">
               <p className="text-sm text-muted-foreground">Total Pending</p>
               <p className="text-xl md:text-2xl font-bold text-destructive mt-1">
-                ₹{totalPending.toLocaleString()}
+                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(totalPending)}
               </p>
             </div>
           </>

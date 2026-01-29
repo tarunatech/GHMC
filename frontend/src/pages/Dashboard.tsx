@@ -78,15 +78,17 @@ export default function Dashboard() {
 
   // Format revenue for display
   const formatRevenue = (amount: number) => {
-    if (amount >= 10000000) return `₹${(amount / 10000000).toFixed(2)}Cr`;
-    if (amount >= 100000) return `₹${(amount / 100000).toFixed(2)}L`;
-    if (amount >= 1000) return `₹${(amount / 1000).toFixed(2)}K`;
-    return `₹${amount.toLocaleString()}`;
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount);
   };
 
   // Format quantity for display
   const formatQuantity = (quantity: number) => {
-    return `${quantity.toFixed(1)} MT`;
+    return `${quantity.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} MT`;
   };
 
   // Prepare payment status data for pie chart
@@ -136,9 +138,9 @@ export default function Dashboard() {
               icon={FileText}
             />
             <StatCard
-              title="Total Inward Revenue (Month)"
-              value={stats ? formatRevenue(stats.revenue.ytd) : "₹0"}
-              subtitle={`Paid: ${stats ? formatRevenue(stats.revenue.paid) : "₹0"} | Pending: ${stats ? formatRevenue(stats.revenue.pending) : "₹0"}`}
+              title="Total Inward Revenue (All Time)"
+              value={stats ? formatRevenue(stats.revenue.allTime) : "₹0"}
+              subtitle={`Paid: ${stats ? formatRevenue(stats.revenue.allTimePaid) : "₹0"} | Pending: ${stats ? formatRevenue(stats.revenue.allTimePending) : "₹0"}`}
               icon={IndianRupee}
             />
           </div>
@@ -208,7 +210,7 @@ export default function Dashboard() {
 
             {/* Payment Data (Monthly) */}
             <div className="glass-card p-6">
-              <h3 className="text-lg font-semibold text-foreground mb-4">Payment Data (Current Month)</h3>
+              <h3 className="text-lg font-semibold text-foreground mb-4">Payment Data (All Time)</h3>
               {paymentStatus ? (
                 <>
                   <div className="h-48">

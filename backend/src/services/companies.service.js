@@ -330,19 +330,11 @@ class CompaniesService {
     const company = await prisma.company.findUnique({
       where: { id: companyId },
       include: {
-        materials: true,
-        inwardEntries: {
-          select: {
-            id: true,
-            quantity: true,
-            rate: true,
-            wasteName: true,
-            invoiceId: true,
-          },
-        },
         invoices: {
+          where: {
+            type: 'Inward',
+          },
           select: {
-            id: true,
             grandTotal: true,
             paymentReceived: true,
           },
@@ -354,22 +346,8 @@ class CompaniesService {
       throw new NotFoundError('Company');
     }
 
-    // Get invoiced entries
-    const invoicedEntries = company.inwardEntries.filter(entry => entry.invoiceId);
-
-    // Get unique invoice IDs from invoiced entries
-    const invoiceIds = [...new Set(invoicedEntries.map(e => e.invoiceId).filter(Boolean))];
-
-    // Calculate actual invoiced total from invoice grand totals
-    let totalInvoiced = 0;
-    if (invoiceIds.length > 0) {
-      const invoices = company.invoices.filter(inv => invoiceIds.includes(inv.id));
-      totalInvoiced = invoices.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
-    }
-
-    // Total paid from all invoices
+    const totalInvoiced = company.invoices.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
     const totalPaid = company.invoices.reduce((sum, inv) => sum + Number(inv.paymentReceived), 0);
-
     const totalPending = Math.max(0, totalInvoiced - totalPaid);
 
     return {
@@ -384,50 +362,18 @@ class CompaniesService {
    * @returns {Promise<object>} Global statistics object
    */
   async getGlobalStats() {
-    const companies = await prisma.company.findMany({
-      include: {
-        materials: true,
-        inwardEntries: {
-          select: {
-            id: true,
-            quantity: true,
-            rate: true,
-            wasteName: true,
-            invoiceId: true,
-          },
-        },
-        invoices: {
-          select: {
-            id: true,
-            grandTotal: true,
-            paymentReceived: true,
-          },
-        },
+    const invoices = await prisma.invoice.findMany({
+      where: {
+        type: 'Inward',
+      },
+      select: {
+        grandTotal: true,
+        paymentReceived: true,
       },
     });
 
-    let totalInvoiced = 0;
-    let totalPaid = 0;
-
-    for (const company of companies) {
-      // Get invoiced entries
-      const invoicedEntries = company.inwardEntries.filter(entry => entry.invoiceId);
-
-      // Get unique invoice IDs from invoiced entries
-      const invoiceIds = [...new Set(invoicedEntries.map(e => e.invoiceId).filter(Boolean))];
-
-      // Calculate actual invoiced total from invoice grand totals
-      let companyInvoiced = 0;
-      if (invoiceIds.length > 0) {
-        const invoices = company.invoices.filter(inv => invoiceIds.includes(inv.id));
-        companyInvoiced = invoices.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
-      }
-
-      const companyPaid = company.invoices.reduce((sum, inv) => sum + Number(inv.paymentReceived), 0);
-
-      totalInvoiced += companyInvoiced;
-      totalPaid += companyPaid;
-    }
+    const totalInvoiced = invoices.reduce((sum, inv) => sum + Number(inv.grandTotal), 0);
+    const totalPaid = invoices.reduce((sum, inv) => sum + Number(inv.paymentReceived), 0);
 
     return {
       totalInvoiced,

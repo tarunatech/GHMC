@@ -16,7 +16,7 @@ class DashboardService {
     const startOfYear = new Date(now.getFullYear(), 0, 1);
 
     // Get current month inward stats
-    const [currentMonthInward, currentMonthOutward, totalInvoices, yearRevenue] = await Promise.all([
+    const [currentMonthInward, currentMonthOutward, totalInvoices, monthRevenue, allTimeRevenueStats] = await Promise.all([
       prisma.inwardEntry.aggregate({
         where: {
           date: {
@@ -59,6 +59,15 @@ class DashboardService {
           paymentReceived: true,
         },
       }),
+      prisma.invoice.aggregate({
+        where: {
+          type: 'Inward',
+        },
+        _sum: {
+          grandTotal: true,
+          paymentReceived: true,
+        },
+      }),
     ]);
 
     // Get all-time totals for comparison
@@ -79,9 +88,16 @@ class DashboardService {
 
     const totalInwardQuantity = parseFloat(currentMonthInward._sum.quantity || 0);
     const totalOutwardQuantity = parseFloat(currentMonthOutward._sum.quantity || 0);
-    const totalRevenue = parseFloat(yearRevenue._sum.grandTotal || 0);
-    const totalPaid = parseFloat(yearRevenue._sum.paymentReceived || 0);
-    const totalPending = totalRevenue - totalPaid;
+
+    // Monthly stats
+    const revenueTotal = parseFloat(monthRevenue._sum.grandTotal || 0);
+    const revenuePaid = parseFloat(monthRevenue._sum.paymentReceived || 0);
+    const revenuePending = revenueTotal - revenuePaid;
+
+    // All-time stats
+    const allTimeTotal = parseFloat(allTimeRevenueStats._sum.grandTotal || 0);
+    const allTimePaid = parseFloat(allTimeRevenueStats._sum.paymentReceived || 0);
+    const allTimePending = allTimeTotal - allTimePaid;
 
     return {
       inward: {
@@ -100,9 +116,12 @@ class DashboardService {
         thisMonth: totalInvoices,
       },
       revenue: {
-        ytd: totalRevenue,
-        paid: totalPaid,
-        pending: totalPending,
+        thisMonth: revenueTotal,
+        thisMonthPaid: revenuePaid,
+        thisMonthPending: revenuePending,
+        allTime: allTimeTotal,
+        allTimePaid: allTimePaid,
+        allTimePending: allTimePending,
       },
     };
   }
@@ -169,36 +188,24 @@ class DashboardService {
    * @returns {Promise<object>} Payment status data
    */
   async getPaymentStatus() {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-
-    // Get all inward invoices for the current month
-    const invoices = await prisma.invoice.findMany({
+    // Get all inward invoices (all time)
+    const invoices = await prisma.invoice.aggregate({
       where: {
         type: 'Inward',
-        date: {
-          gte: startOfMonth,
-        },
       },
-      select: {
+      _sum: {
         grandTotal: true,
         paymentReceived: true,
       },
     });
 
-    let totalInvoiced = 0;
-    let totalReceived = 0;
-
-    invoices.forEach((invoice) => {
-      totalInvoiced += parseFloat(invoice.grandTotal || 0);
-      totalReceived += parseFloat(invoice.paymentReceived || 0);
-    });
-
+    const totalInvoiced = parseFloat(invoices._sum.grandTotal || 0);
+    const totalReceived = parseFloat(invoices._sum.paymentReceived || 0);
     const totalPending = totalInvoiced - totalReceived;
 
     return {
       total: totalInvoiced,
-      received: totalReceived, // Previously 'paid'
+      received: totalReceived,
       pending: totalPending,
     };
   }
