@@ -73,6 +73,8 @@ export interface Invoice {
   poNo: string | null;
   poDate: string | null;
   vehicleNo: string | null;
+  customKey: string | null;
+  customValue: string | null;
 }
 
 export interface CreateInvoiceData {
@@ -117,6 +119,8 @@ export interface CreateInvoiceData {
   poNo?: string;
   poDate?: string;
   vehicleNo?: string;
+  customKey?: string;
+  customValue?: string;
 }
 
 export interface UpdateInvoiceData {
@@ -154,6 +158,8 @@ export interface UpdateInvoiceData {
   poNo?: string;
   poDate?: string;
   vehicleNo?: string;
+  customKey?: string;
+  customValue?: string;
 }
 
 export interface UpdatePaymentData {

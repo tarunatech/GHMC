@@ -34,7 +34,7 @@ export default function Login() {
             <div className="flex items-center justify-center w-24 h-24 rounded-2xl bg-white mx-auto mb-6 p-2 shadow-sm">
               <img src={logo} alt="GHMC Logo" className="w-full h-full object-contain" />
             </div>
-            <h1 className="text-xl font-bold text-foreground leading-tight px-4">GUJARAT HAZARD WEST MANAGEMENT & CO.</h1>
+            <h1 className="text-xl font-bold text-foreground leading-tight px-4">GUJARAT HAZARDWEST MANAGEMENT & CO.</h1>
             <p className="text-sm text-muted-foreground mt-2">Sign in to your account</p>
           </div>
 

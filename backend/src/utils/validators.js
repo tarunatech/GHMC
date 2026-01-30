@@ -364,6 +364,8 @@ export const createInvoiceSchema = Joi.object({
   poNo: Joi.string().optional().allow('', null),
   poDate: Joi.date().optional().allow(null, ''),
   vehicleNo: Joi.string().optional().allow('', null),
+  customKey: Joi.string().optional().allow('', null),
+  customValue: Joi.string().optional().allow('', null),
 });
 
 export const updateInvoiceSchema = Joi.object({
@@ -408,6 +410,8 @@ export const updateInvoiceSchema = Joi.object({
   poNo: Joi.string().optional().allow('', null),
   poDate: Joi.date().optional().allow(null, ''),
   vehicleNo: Joi.string().optional().allow('', null),
+  customKey: Joi.string().optional().allow('', null),
+  customValue: Joi.string().optional().allow('', null),
 });
 
 export const updateInvoicePaymentSchema = Joi.object({

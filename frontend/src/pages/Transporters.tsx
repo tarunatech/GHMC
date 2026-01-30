@@ -232,6 +232,7 @@ export default function Transporters() {
     },
     { key: "transporterId", header: "Transporter ID" },
     { key: "contact", header: "Contact", render: (t: Transporter) => t.contact || '-' },
+    { key: "email", header: "Email", render: (t: Transporter) => t.email || '-' },
     { key: "address", header: "Address", render: (t: Transporter) => t.address || '-' },
     {
       key: "gstNumber",

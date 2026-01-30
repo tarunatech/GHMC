@@ -1,9 +1,10 @@
 import { PrismaClient } from '@prisma/client';
+import fs from 'fs';
 const prisma = new PrismaClient();
 
 async function main() {
     const users = await prisma.user.findMany();
-    console.log('Users in DB:', users.map(u => ({ email: u.email, role: u.role, isActive: u.isActive })));
+    fs.writeFileSync('users_json.txt', JSON.stringify(users, null, 2));
     await prisma.$disconnect();
 }
 

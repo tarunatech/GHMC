@@ -1,0 +1,35 @@
+[
+  {
+    "id": "66f97787-cb46-4ac2-82ac-2560b476c954",
+    "email": "admin@ghmcwest.com",
+    "passwordHash": "$2a$10$QUkdnTjct2fQRXBoThYc9OhA5mxdCC.wYj6A.iWSuwtd7DYYrbO12",
+    "fullName": "Administrator",
+    "phone": null,
+    "role": "admin",
+    "isActive": true,
+    "createdAt": "2026-01-30T05:50:51.389Z",
+    "updatedAt": "2026-01-30T05:50:51.389Z"
+  },
+  {
+    "id": "c98a3331-d18d-46de-b210-dab4d2dd3151",
+    "email": "superadmin@ghmcwest.com",
+    "passwordHash": "$2a$10$bXaK5Z6HKFDactvdqWtN3uyGM8FpTrEs4DSSAsfWm6gLL6cWt6/JC",
+    "fullName": "Super Administrator",
+    "phone": null,
+    "role": "superadmin",
+    "isActive": true,
+    "createdAt": "2026-01-30T05:50:52.092Z",
+    "updatedAt": "2026-01-30T05:50:52.092Z"
+  },
+  {
+    "id": "ec708e90-4502-4cf1-9d9c-74d559a58989",
+    "email": "employee@ghmcwest.com",
+    "passwordHash": "$2a$10$Ix7J.Epvq1hYknDgAOv0GOnTo/sGWNkuW/bH9fzBnXS5iIwAUA9fO",
+    "fullName": "Employee User",
+    "phone": null,
+    "role": "employee",
+    "isActive": true,
+    "createdAt": "2026-01-30T05:52:21.972Z",
+    "updatedAt": "2026-01-30T05:52:21.972Z"
+  }
+]

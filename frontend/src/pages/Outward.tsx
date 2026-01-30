@@ -491,7 +491,7 @@ export default function Outward() {
                     console.error(error);
                   }
                 }}>
-                  Export Entry Records
+                  Export Outward Entry
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={async () => {
                   try {
@@ -564,7 +564,7 @@ export default function Outward() {
                     console.error(error);
                   }
                 }}>
-                  Export Material Records
+                  Export Outward Transport Entry
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -642,7 +642,7 @@ export default function Outward() {
               setEditingMaterial(null);
               setIsMaterialModalOpen(true);
             }}>
-              <Plus className="w-4 h-4 mr-2" /> Add Material Record
+              <Plus className="w-4 h-4 mr-2" /> Add Outward Transporter Entry
             </Button>
           )}
         </div>
@@ -1178,6 +1178,8 @@ function OutwardEntryDetails({ entry }: { entry: OutwardEntry }) {
         customerAddress: invoiceData.billedTo || '',
         customerGst: invoiceData.gstNo || '',
         description: invoiceData.description || '',
+        customKey: invoiceData.customKey,
+        customValue: invoiceData.customValue,
         items: materials.length > 0
           ? materials.map(m => ({
             description: (m as any).description || '',

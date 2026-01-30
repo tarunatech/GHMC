@@ -76,6 +76,8 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
     poNo: '',
     poDate: '',
     vehicleNo: '',
+    customKey: '',
+    customValue: '',
   });
 
 
@@ -293,6 +295,8 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
         poNo: fullInvoice.poNo || '',
         poDate: fullInvoice.poDate ? fullInvoice.poDate.slice(0, 10) : '',
         vehicleNo: fullInvoice.vehicleNo || '',
+        customKey: fullInvoice.customKey || '',
+        customValue: fullInvoice.customValue || '',
       }));
 
 
@@ -350,6 +354,8 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
           poNo: formData.poNo,
           poDate: formData.poDate,
           vehicleNo: formData.vehicleNo,
+          customKey: formData.customKey,
+          customValue: formData.customValue,
         };
         console.log('DEBUG: Updating Invoice with payload:', updatePayload);
         await invoicesService.updateInvoice(existingInvoice.id, updatePayload);
@@ -379,6 +385,8 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
           poNo: formData.poNo,
           poDate: formData.poDate,
           vehicleNo: formData.vehicleNo,
+          customKey: formData.customKey,
+          customValue: formData.customValue,
         };
 
         console.log('DEBUG: Creating Invoice with data:', invoiceData);
@@ -410,6 +418,8 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
         poNo: '',
         poDate: '',
         vehicleNo: '',
+        customKey: '',
+        customValue: '',
       });
       setIsAppendMode(false);
       setExistingInvoice(null);
@@ -695,6 +705,26 @@ export default function CreateInvoiceModal({ isOpen, onClose, type, preselectedE
                   value={formData.vehicleNo}
                   onChange={(e) => setFormData({ ...formData, vehicleNo: e.target.value })}
                   placeholder="e.g. MH12AB1234"
+                />
+              </div>
+              <div className="md:col-span-1">
+                <label className="block text-sm font-medium text-foreground mb-1.5">Custom Key</label>
+                <input
+                  type="text"
+                  className="input-field w-full"
+                  value={formData.customKey}
+                  onChange={(e) => setFormData({ ...formData, customKey: e.target.value })}
+                  placeholder="e.g. SC No."
+                />
+              </div>
+              <div className="md:col-span-1">
+                <label className="block text-sm font-medium text-foreground mb-1.5">Custom Value</label>
+                <input
+                  type="text"
+                  className="input-field w-full"
+                  value={formData.customValue}
+                  onChange={(e) => setFormData({ ...formData, customValue: e.target.value })}
+                  placeholder="Value"
                 />
               </div>
             </>

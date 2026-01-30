@@ -212,6 +212,8 @@ model Invoice {
   poNo                         String?           @map("po_no")
   poDate                       DateTime?         @map("po_date") @db.Date
   vehicleNo                    String?           @map("vehicle_no")
+  customKey                    String?           @map("custom_key")
+  customValue                  String?           @map("custom_value")
   createdAt                    DateTime          @default(now()) @map("created_at")
   updatedAt                    DateTime          @updatedAt @map("updated_at")
   additionalCharges            Decimal?          @default(0) @map("additional_charges") @db.Decimal(10, 2)

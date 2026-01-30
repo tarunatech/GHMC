@@ -567,7 +567,7 @@ export default function Inward() {
                     console.error(error);
                   }
                 }}>
-                  Export Entry Records
+                  Export Inward Entry
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={async () => {
                   try {
@@ -642,7 +642,7 @@ export default function Inward() {
                     console.error(error);
                   }
                 }}>
-                  Export Material Records
+                  Export Inward Transport Entry
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -715,7 +715,7 @@ export default function Inward() {
           </div>
           {user?.role !== 'admin' && (
             <Button onClick={() => setIsMaterialModalOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" /> Add Material Record
+              <Plus className="w-4 h-4 mr-2" /> Add Inward Transporter Entry
             </Button>
           )}
         </div>
@@ -1167,6 +1167,8 @@ function InwardEntryDetails({ entry }: { entry: InwardEntry }) {
         customerAddress: invoiceData.billedTo || '',
         customerGst: invoiceData.gstNo || entry.company?.gstNumber || '',
         description: invoiceData.description || '',
+        customKey: invoiceData.customKey,
+        customValue: invoiceData.customValue,
         items: materials.length > 0
           ? materials.map(m => ({
             description: (m as any).description || '',

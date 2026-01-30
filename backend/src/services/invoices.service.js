@@ -390,6 +390,8 @@ class InvoicesService {
       poNo,
       poDate,
       vehicleNo,
+      customKey,
+      customValue,
     } = invoiceData;
 
     // Validate type
@@ -495,6 +497,8 @@ class InvoicesService {
         poNo: poNo || null,
         poDate: poDate ? new Date(poDate) : null,
         vehicleNo: vehicleNo || null,
+        customKey: customKey || null,
+        customValue: customValue || null,
         invoiceManifests: {
           create: manifestNos.map((manifestNo) => ({
             manifestNo,
@@ -638,6 +642,8 @@ class InvoicesService {
       poNo,
       poDate,
       vehicleNo,
+      customKey,
+      customValue,
     } = updateData;
 
 
@@ -696,6 +702,8 @@ class InvoicesService {
       poNo,
       poDate: poDate !== undefined ? (poDate ? new Date(poDate) : null) : undefined,
       vehicleNo,
+      customKey,
+      customValue,
     };
 
     // Remove undefined values

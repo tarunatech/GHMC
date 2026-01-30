@@ -152,6 +152,8 @@ export default function Invoices() {
         date: fullInvoice.date,
         poDate: fullInvoice.poDate || null,
         vehicleNo: fullInvoice.vehicleNo || vehicleNo,
+        customKey: fullInvoice.customKey,
+        customValue: fullInvoice.customValue,
         customerName: fullInvoice.customerName || fullInvoice.company?.name || '',
         customerAddress: fullInvoice.billedTo || '',
         customerGst: fullInvoice.gstNo || fullInvoice.company?.gstNumber || '',
@@ -584,6 +586,12 @@ function InvoiceDetails({
           <p className="text-sm text-muted-foreground">Status</p>
           <StatusBadge status={invoice.status} />
         </div>
+        {invoice.customKey && invoice.customValue && (
+          <div>
+            <p className="text-sm text-muted-foreground">{invoice.customKey}</p>
+            <p className="font-medium text-foreground">{invoice.customValue}</p>
+          </div>
+        )}
       </div>
 
       {/* Customer Info */}

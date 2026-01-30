@@ -110,7 +110,7 @@ export default function Dashboard() {
   const isLoading = statsLoading || wasteFlowLoading || revenueLoading || paymentStatusLoading || activityLoading;
 
   return (
-    <MainLayout title="Dashboard" subtitle="GUJARAT HAZARD WEST MANAGEMENT & CO. Overview">
+    <MainLayout title="Dashboard" subtitle="GUJARAT HAZARDWEST MANAGEMENT & CO. Overview">
       {isLoading ? (
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />

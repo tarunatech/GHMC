@@ -56,7 +56,7 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   doc.setTextColor(greenColor);
   doc.setFontSize(22);
   doc.setFont('helvetica', 'bold');
-  const text1 = 'GUJARAT HAZARD WEST';
+  const text1 = 'GUJARAT HAZARDWEST';
   const text2 = 'MANAGEMENT CO.';
   doc.text(text1, 105, 15, { align: 'center' });
   doc.text(text2, 105, 23, { align: 'center' });
@@ -117,19 +117,32 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   // Row 3
   doc.text('GST No.', col1 + 2, startY + 19);
   doc.text('24ABDFG3216E1ZZ', col2 + 2, startY + 19);
-  doc.text('Vehical No.', col3 + 2, startY + 19);
+  doc.text('Vehicle No.', col3 + 2, startY + 19);
   doc.text(invoiceData.vehicleNo || '-', col4 + 2, startY + 19);
   doc.line(10, startY + 21, 200, startY + 21);
 
+  // Row 4 (Custom Field)
+  let currentGridBottom = 61;
+  if (invoiceData.customKey || invoiceData.customValue) {
+    doc.text(invoiceData.customKey || 'Custom Field', col1 + 2, startY + 26);
+    doc.text(invoiceData.customValue || '-', col2 + 2, startY + 26);
+    doc.line(10, startY + 28, 200, startY + 28);
+    currentGridBottom = 68;
+  }
+
   // Draw vertical lines for the grid
-  doc.line(10, 40, 10, 61); // Left border
-  doc.line(35, 40, 35, 61); // After Label 1
-  doc.line(105, 40, 105, 61); // Middle
-  doc.line(130, 40, 130, 61); // After Label 2
-  doc.line(200, 40, 200, 61); // Right border
+  doc.line(10, 40, 10, currentGridBottom); // Left border
+  doc.line(35, 40, 35, currentGridBottom); // After Label 1 (Column for labels)
+
+  // These middle lines should only go down to the 3rd row (y=61) if there's a custom row spanning across
+  const middleLinesBottom = (invoiceData.customKey || invoiceData.customValue) ? 61 : currentGridBottom;
+  doc.line(105, 40, 105, middleLinesBottom); // Middle vertical separator
+  doc.line(130, 40, 130, middleLinesBottom); // After Label 2 (Column for PO/Vehicle)
+
+  doc.line(200, 40, 200, currentGridBottom); // Right border
 
   // --- Billed To & Shipped To ---
-  const addressY = 61;
+  const addressY = currentGridBottom;
   const midX = 105;
 
   doc.setFont('helvetica', 'bold');
@@ -155,11 +168,11 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   }
 
   // Box for Billed/Shipped
-  doc.rect(10, 61, 190, 45); // Increased height from 35 to 45
-  doc.line(midX, 61, midX, 106); // Extended vertical separator to 106 (61 + 45)
+  doc.rect(10, addressY, 190, 45); // Increased height from 35 to 45
+  doc.line(midX, addressY, midX, addressY + 45); // Extended vertical separator
 
   // --- Item Table ---
-  const tableStartY = 106;
+  const tableStartY = addressY + 45;
 
   const tableHead = [['Sr. No.', 'Description of goods/service', 'HSN code', 'Qty.', 'Unit', 'Rate', 'Amount']];
 
@@ -406,11 +419,11 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   // Signature (Right)
   const centerX = 105 + (190 / 2); // Center of the right side (105 to 200)
   doc.setFontSize(8);
-  doc.text('For GUJARAT HAZARD WEST MANAGEMENT CO.', 152.5, finalY + 10, { align: 'center' });
+  doc.text('For GUJARAT HAZARDWEST MANAGEMENT CO.', 152.5, finalY + 6, { align: 'center' });
 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
-  doc.text('Autorised Signatory', 152.5, finalY + 32, { align: 'center' });
+  doc.text('Authorised Signatory', 152.5, finalY + 36, { align: 'center' });
 
   // Bottom text removed as requested: This is computergenerated invoice
   // doc.text('This is computergenerated invoice', 105, finalY + footerHeight + 4, { align: 'center' });

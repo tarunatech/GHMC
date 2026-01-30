@@ -57,7 +57,7 @@ export function Sidebar({ className, onItemClick }: SidebarProps) {
         {!collapsed && (
           <div className="slide-in">
             <h1 className="font-bold text-foreground text-lg uppercase tracking-wider">GHMC</h1>
-            <p className="text-[10px] text-muted-foreground uppercase">Gujarat Hazard West Management</p>
+            <p className="text-[10px] text-muted-foreground uppercase">Gujarat HazardWest Management</p>
           </div>
         )}
       </div>
