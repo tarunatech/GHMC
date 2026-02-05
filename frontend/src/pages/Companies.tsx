@@ -192,12 +192,10 @@ export default function Companies() {
   };
 
   const removeMaterial = (index: number) => {
-    if (formData.materials.length > 1) {
-      setFormData(prev => ({
-        ...prev,
-        materials: prev.materials.filter((_, i) => i !== index)
-      }));
-    }
+    setFormData(prev => ({
+      ...prev,
+      materials: prev.materials.filter((_, i) => i !== index)
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -236,10 +234,11 @@ export default function Companies() {
         unit: normalizeUnitForBackend(m.unit)
       }));
 
-    if (validMaterials.length === 0) {
-      toast.error("Please add at least one material");
-      return;
-    }
+    // Optional: Only validate if materials are present
+    // if (validMaterials.length === 0) {
+    //   toast.error("Please add at least one material");
+    //   return;
+    // }
 
     const companyData: CreateCompanyData = {
       name: formData.name.trim(),
@@ -683,68 +682,84 @@ export default function Companies() {
               </button>
             </div>
             <div className="space-y-4">
-              {formData.materials.map((materialItem, index) => (
-                <div key={index} className="flex flex-col sm:flex-row gap-3 items-end p-3 rounded-lg bg-secondary/10 sm:bg-transparent sm:p-0 border border-border sm:border-0">
-                  <div className="w-full sm:flex-1">
-                    <label className="block text-xs font-medium text-foreground mb-1">
-                      Material Name {index + 1}
-                    </label>
-                    <input
-                      type="text"
-                      className="input-field w-full"
-                      placeholder="Enter material type"
-                      value={materialItem.material}
-                      onChange={(e) => handleMaterialChange(index, 'material', e.target.value)}
-                      required
-                    />
+              {formData.materials.length > 0 ? (
+                formData.materials.map((materialItem, index) => (
+                  <div key={index} className="flex flex-col sm:flex-row gap-3 items-end p-3 rounded-lg bg-secondary/10 sm:bg-transparent sm:p-0 border border-border sm:border-0">
+                    <div className="w-full sm:flex-1">
+                      <label className="block text-xs font-medium text-foreground mb-1">
+                        Material Name {index + 1}
+                      </label>
+                      <input
+                        type="text"
+                        className="input-field w-full"
+                        placeholder="Enter material type"
+                        value={materialItem.material}
+                        onChange={(e) => handleMaterialChange(index, 'material', e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="flex gap-3 w-full sm:w-auto">
+                      {['admin', 'superadmin'].includes(user?.role || '') && (
+                        <>
+                          <div className="flex-1 sm:w-24">
+                            <label className="block text-xs font-medium text-foreground mb-1">
+                              Unit
+                            </label>
+                            <select
+                              className="input-field w-full"
+                              value={materialItem.unit}
+                              onChange={(e) => handleMaterialChange(index, 'unit', e.target.value as "MT" | "Kg" | "KL")}
+                              required
+                            >
+                              <option value="MT">MT</option>
+                              <option value="Kg">KG</option>
+                              <option value="KL">KL</option>
+                            </select>
+                          </div>
+                          <div className="flex-1 sm:w-32">
+                            <label className="block text-xs font-medium text-foreground mb-1">
+                              Rate (₹)
+                            </label>
+                            <input
+                              type="number"
+                              className={`input-field w-full ${user?.role !== 'superadmin' ? 'bg-muted/50 cursor-not-allowed opacity-75' : ''}`}
+                              placeholder={user?.role === 'superadmin' ? "0.00" : "Pending..."}
+                              value={materialItem.rate}
+                              onChange={(e) => handleMaterialChange(index, 'rate', e.target.value)}
+                              min="0"
+                              step="0.01"
+                              disabled={user?.role !== 'superadmin'}
+                              title={user?.role !== 'superadmin' ? "Only Super Admin can define rates" : ""}
+                            />
+                          </div>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removeMaterial(index)}
+                        className="text-red-500 hover:text-red-700 p-2 self-end sm:self-auto"
+                        title="Remove material"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-3 w-full sm:w-auto">
-                    {['admin', 'superadmin'].includes(user?.role || '') && (
-                      <>
-                        <div className="flex-1 sm:w-24">
-                          <label className="block text-xs font-medium text-foreground mb-1">
-                            Unit
-                          </label>
-                          <select
-                            className="input-field w-full"
-                            value={materialItem.unit}
-                            onChange={(e) => handleMaterialChange(index, 'unit', e.target.value as "MT" | "Kg" | "KL")}
-                            required
-                          >
-                            <option value="MT">MT</option>
-                            <option value="Kg">KG</option>
-                            <option value="KL">KL</option>
-                          </select>
-                        </div>
-                        <div className="flex-1 sm:w-32">
-                          <label className="block text-xs font-medium text-foreground mb-1">
-                            Rate (₹)
-                          </label>
-                          <input
-                            type="number"
-                            className={`input-field w-full ${user?.role !== 'superadmin' ? 'bg-muted/50 cursor-not-allowed opacity-75' : ''}`}
-                            placeholder={user?.role === 'superadmin' ? "0.00" : "Pending..."}
-                            value={materialItem.rate}
-                            onChange={(e) => handleMaterialChange(index, 'rate', e.target.value)}
-                            min="0"
-                            step="0.01"
-                            disabled={user?.role !== 'superadmin'}
-                            title={user?.role !== 'superadmin' ? "Only Super Admin can define rates" : ""}
-                          />
-                        </div>
-                      </>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => removeMaterial(index)}
-                      className="text-red-500 hover:text-red-700 p-2 self-end sm:self-auto"
-                      title="Remove material"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 px-4 border-2 border-dashed border-border rounded-xl bg-secondary/5">
+                  <p className="text-sm text-muted-foreground italic mb-3">No materials added to this company</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addMaterial}
+                    className="gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add First Material
+                  </Button>
                 </div>
-              ))}
+              )}
             </div>
           </div>
 
