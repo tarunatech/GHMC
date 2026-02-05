@@ -52,8 +52,8 @@ export const createCompanySchema = Joi.object({
     .items(
       Joi.object({
         material: Joi.string().required(),
-        rate: Joi.number().positive().required(),
-        unit: Joi.string().valid('MT', 'Kg', 'KL').required(),
+        rate: Joi.number().positive().optional().allow(null, ""),
+        unit: Joi.string().valid('MT', 'Kg', 'KL').optional().default('Kg'),
       })
     )
     .optional()
@@ -75,19 +75,17 @@ export const addMaterialSchema = Joi.object({
   material: Joi.string().min(1).required().messages({
     'any.required': 'Material name is required',
   }),
-  rate: Joi.number().positive().required().messages({
+  rate: Joi.number().positive().optional().allow(null, "").messages({
     'number.positive': 'Rate must be greater than 0',
-    'any.required': 'Rate is required',
   }),
-  unit: Joi.string().valid('MT', 'Kg', 'KL').required().messages({
+  unit: Joi.string().valid('MT', 'Kg', 'KL').optional().default('Kg').messages({
     'any.only': 'Unit must be MT, Kg, or KL',
-    'any.required': 'Unit is required',
   }),
 });
 
 export const updateMaterialSchema = Joi.object({
   material: Joi.string().min(1).optional(),
-  rate: Joi.number().positive().optional(),
+  rate: Joi.number().positive().optional().allow(null, ""),
   unit: Joi.string().valid('MT', 'Kg', 'KL').optional(),
 });
 

@@ -284,7 +284,13 @@ export default function Inward() {
     { key: "vehicleNo", header: "Vehicle No.", render: (e: InwardEntry) => e.vehicleNo || '-' },
     { key: "wasteName", header: "Waste Name" },
     ...(['admin', 'superadmin'].includes(user?.role || '') ? [
-      { key: "rate", header: "Rate", render: (e: InwardEntry) => e.rate ? `₹${Number(e.rate).toFixed(2)}/${e.unit}` : '-' },
+      {
+        key: "rate",
+        header: "Rate",
+        render: (e: InwardEntry) => e.rate
+          ? `₹${Number(e.rate).toFixed(2)}/${e.unit}`
+          : <span className="text-[10px] text-amber-500 font-medium uppercase tracking-tight">Rate not defined</span>
+      },
     ] : []),
     {
       key: "category",
@@ -302,6 +308,7 @@ export default function Inward() {
         render: (e: InwardEntry) => {
           const quantity = Number(e.quantity) || 0;
           const rate = Number(e.rate) || 0;
+          if (!e.rate) return <span className="text-[10px] text-amber-500 font-medium">PENDING</span>;
           const amount = quantity * rate;
           return `₹${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
         }
@@ -926,8 +933,8 @@ function InwardEntryForm({ companies, entry, onCancel, onSubmit, isLoading }: an
       return;
     }
 
-    // Validate rate if provided and user is admin or superadmin
-    if (['admin', 'superadmin'].includes(user?.role || '') && formData.rate && !isPositiveNumber(formData.rate)) {
+    // Validate rate if provided and user is superadmin
+    if (user?.role === 'superadmin' && formData.rate && !isPositiveNumber(formData.rate)) {
       toast.error("Rate must be a positive number");
       return;
     }
@@ -1030,7 +1037,9 @@ function InwardEntryForm({ companies, entry, onCancel, onSubmit, isLoading }: an
             <option value="">Select Waste Material</option>
             {companyMaterials.map((m: any) => (
               <option key={m.id} value={m.materialName}>
-                {['admin', 'superadmin'].includes(user?.role || '') ? `${m.materialName} (${m.rate}/${m.unit})` : m.materialName}
+                {['admin', 'superadmin'].includes(user?.role || '')
+                  ? `${m.materialName} (${m.rate ? `${m.rate}/${m.unit}` : 'Rate Pending'})`
+                  : m.materialName}
               </option>
             ))}
             {!formData.companyId && <option value="" disabled>Select a company first</option>}
@@ -1078,13 +1087,17 @@ function InwardEntryForm({ companies, entry, onCancel, onSubmit, isLoading }: an
         </div>
         {['admin', 'superadmin'].includes(user?.role || '') && (
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Rate</label>
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              Rate {user?.role !== 'superadmin' && <span className="text-[10px] text-amber-500 ml-1">(Super Admin only)</span>}
+            </label>
             <input
               type="number"
               step="0.01"
-              className="input-field w-full"
+              className={`input-field w-full ${user?.role !== 'superadmin' ? 'bg-muted/50 cursor-not-allowed opacity-75' : ''}`}
               value={formData.rate}
               onChange={(e) => setFormData({ ...formData, rate: e.target.value })}
+              disabled={user?.role !== 'superadmin'}
+              placeholder={user?.role === 'superadmin' ? "0.00" : "Rate pending..."}
             />
           </div>
         )}
@@ -1244,7 +1257,10 @@ function InwardEntryDetails({ entry }: { entry: InwardEntry }) {
             <div>
               <p className="text-sm text-muted-foreground">Rate</p>
               <p className="font-medium text-foreground">
-                {entry.rate ? `₹${Number(entry.rate).toFixed(2)}/${entry.unit}` : '-'}
+                {entry.rate
+                  ? `₹${Number(entry.rate).toFixed(2)}/${entry.unit}`
+                  : <span className="text-amber-500">Rate not defined</span>
+                }
               </p>
             </div>
             <div>

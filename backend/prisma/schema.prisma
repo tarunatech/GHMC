@@ -42,7 +42,7 @@ model CompanyMaterial {
   id           String   @id @default(uuid())
   companyId    String   @map("company_id")
   materialName String   @map("material_name")
-  rate         Decimal  @db.Decimal(10, 2)
+  rate         Decimal? @db.Decimal(10, 2)
   unit         String
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")

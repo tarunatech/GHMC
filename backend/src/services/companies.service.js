@@ -146,7 +146,7 @@ class CompaniesService {
         materials: {
           create: materials.map((material) => ({
             materialName: material.material.trim(),
-            rate: parseFloat(material.rate),
+            rate: material.rate ? parseFloat(material.rate) : null,
             unit: material.unit,
           })),
         },
@@ -243,8 +243,10 @@ class CompaniesService {
       throw new ValidationError('Material name is required');
     }
 
-    if (!rate || rate <= 0) {
-      throw new ValidationError('Rate must be greater than 0');
+    if (rate !== undefined && rate !== null && rate !== '') {
+      if (parseFloat(rate) < 0) {
+        throw new ValidationError('Rate cannot be negative');
+      }
     }
 
     if (!['MT', 'Kg', 'KL'].includes(unit)) {
@@ -255,7 +257,7 @@ class CompaniesService {
       data: {
         companyId,
         materialName: material.trim(),
-        rate: parseFloat(rate),
+        rate: (rate !== undefined && rate !== null && rate !== '') ? parseFloat(rate) : null,
         unit,
       },
     });
@@ -288,7 +290,7 @@ class CompaniesService {
       where: { id: materialId },
       data: {
         ...(updateData.material !== undefined && { materialName: updateData.material.trim() }),
-        ...(updateData.rate !== undefined && { rate: parseFloat(updateData.rate) }),
+        ...(updateData.rate !== undefined && { rate: (updateData.rate !== null && updateData.rate !== '') ? parseFloat(updateData.rate) : null }),
         ...(updateData.unit !== undefined && { unit: updateData.unit }),
       },
     });

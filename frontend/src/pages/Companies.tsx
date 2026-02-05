@@ -94,13 +94,8 @@ export default function Companies() {
       await companiesService.updateCompany(data.id, data.companyData);
 
       // 2. Handle Materials
-      // Only sync materials if user is admin/superadmin
-      const isAdmin = ['admin', 'superadmin'].includes(user?.role || '');
-      if (!isAdmin) return;
-
       // Fetch fresh existing materials to diff
       const existingMaterials = await companiesService.getCompanyMaterials(data.id);
-
       const formMaterials = data.materials;
 
       // A. Delete materials that are not in form
@@ -117,19 +112,16 @@ export default function Companies() {
           // Update existing
           await companiesService.updateMaterial(data.id, m.id, {
             material: m.material,
-            rate: Number(m.rate),
-            unit: normalizeUnitForBackend(m.unit) // Normalize to match backend validation
+            rate: m.rate !== null && m.rate !== "" ? Number(m.rate) : null,
+            unit: normalizeUnitForBackend(m.unit)
           });
         } else {
           // Add new
-          // Only add if it has content
-          if (m.material && m.rate) {
-            await companiesService.addMaterial(data.id, {
-              material: m.material,
-              rate: Number(m.rate),
-              unit: normalizeUnitForBackend(m.unit) // Normalize to match backend validation
-            });
-          }
+          await companiesService.addMaterial(data.id, {
+            material: m.material,
+            rate: m.rate !== null && m.rate !== "" ? Number(m.rate) : null,
+            unit: normalizeUnitForBackend(m.unit)
+          });
         }
       }
     },
@@ -143,9 +135,8 @@ export default function Companies() {
     },
     onError: (error: any) => {
       logError('Updating company', error);
-      const isAdmin = ['admin', 'superadmin'].includes(user?.role || '');
       const baseMessage = getErrorMessage(error, 'Failed to update company');
-      toast.error(!isAdmin ? `${baseMessage} (Note: Employees cannot edit materials)` : baseMessage);
+      toast.error(baseMessage);
     },
   });
 
@@ -235,21 +226,18 @@ export default function Companies() {
       return;
     }
 
-    const isAdmin = ['admin', 'superadmin'].includes(user?.role || '');
-    const validMaterials = isAdmin
-      ? formData.materials
-        .filter(m => m.material.trim() && m.rate.toString().trim() && m.unit)
-        .map(m => ({
-          id: m.id,
-          material: m.material.trim(),
-          rate: parseFloat(m.rate as string) || 0,
-          unit: normalizeUnitForBackend(m.unit) // Normalize to match backend validation
-        }))
-      : [];
+    const isSuperAdmin = user?.role === 'superadmin';
+    const validMaterials = formData.materials
+      .filter(m => m.material.trim() && m.unit)
+      .map(m => ({
+        id: m.id,
+        material: m.material.trim(),
+        rate: m.rate ? parseFloat(m.rate as string) : null,
+        unit: normalizeUnitForBackend(m.unit)
+      }));
 
-    // Only validate materials for admins
-    if (isAdmin && validMaterials.length === 0) {
-      toast.error("Please add at least one material with rate and unit");
+    if (validMaterials.length === 0) {
+      toast.error("Please add at least one material");
       return;
     }
 
@@ -284,11 +272,11 @@ export default function Companies() {
       city: company.city || "",
       contact: company.contact || "",
       email: company.email || "",
-      materials: isAdmin && company.materials && company.materials.length > 0
+      materials: company.materials && company.materials.length > 0
         ? company.materials.map(m => ({
-          id: m.id, // Store ID for updates
+          id: m.id,
           material: m.materialName,
-          rate: (m.rate ?? "").toString(),
+          rate: m.rate !== null && m.rate !== undefined ? m.rate.toString() : "",
           unit: m.unit as any
         }))
         : [{ id: "", material: "", rate: "", unit: "Kg" }]
@@ -359,16 +347,23 @@ export default function Companies() {
       header: "Materials & Rates",
       render: (company: Company) => (
         <div className="text-sm">
-          {company.materials && company.materials.length > 0 ? (
-            company.materials.slice(0, 2).map((item, index) => (
-              <div key={`${item.id}-${index}`} className="mb-1">
-                <span className="font-medium">{item.materialName}</span>
-                <span className="text-muted-foreground ml-2">₹{Number(item.rate).toFixed(2)}/{item.unit}</span>
-              </div>
-            ))
-          ) : (
-            <span className="text-muted-foreground">No materials</span>
-          )}
+          <div className="text-sm">
+            {company.materials && company.materials.length > 0 ? (
+              company.materials.slice(0, 2).map((item, index) => (
+                <div key={`${item.id}-${index}`} className="mb-1">
+                  <span className="font-medium">{item.materialName}</span>
+                  <span className="text-muted-foreground ml-2">
+                    {item.rate !== null && item.rate !== undefined
+                      ? `₹${Number(item.rate).toFixed(2)}/${item.unit}`
+                      : <span className="text-xs text-amber-500 font-normal">(Rate not defined)</span>
+                    }
+                  </span>
+                </div>
+              ))
+            ) : (
+              <span className="text-muted-foreground">No materials</span>
+            )}
+          </div>
         </div>
       ),
     }] : []),
@@ -668,83 +663,90 @@ export default function Companies() {
 
 
 
-          {['admin', 'superadmin'].includes(user?.role || '') && (
-            <div>
-              <div className="flex items-center justify-between mb-3">
+          {/* Materials Section Enabled for everyone - Restricted Rate visibility/editing */}
+          <div>
+            <div className="flex items-center justify-between mb-3 border-t border-border pt-4 mt-2">
+              <div className="space-y-0.5">
                 <label className="block text-sm font-medium text-foreground">
-                  Materials & Rates *
+                  {['admin', 'superadmin'].includes(user?.role || '') ? 'Materials & Rates' : 'Materials'}
                 </label>
-                <button
-                  type="button"
-                  onClick={addMaterial}
-                  className="text-sm text-primary hover:text-primary/80 font-medium"
-                >
-                  + Add Material
-                </button>
+                {user?.role === 'admin' && (
+                  <p className="text-[10px] text-amber-500 font-medium uppercase tracking-tight">Only Super Admin can define/edit rates</p>
+                )}
               </div>
-              <div className="space-y-4">
-                {formData.materials.map((materialItem, index) => (
-                  <div key={index} className="flex flex-col sm:flex-row gap-3 items-end p-3 rounded-lg bg-secondary/20 sm:bg-transparent sm:p-0">
-                    <div className="w-full sm:flex-1">
-                      <label className="block text-xs font-medium text-foreground mb-1">
-                        Material {index + 1}
-                      </label>
-                      <input
-                        type="text"
-                        className="input-field w-full"
-                        placeholder="Enter material type"
-                        value={materialItem.material}
-                        onChange={(e) => handleMaterialChange(index, 'material', e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="flex gap-3 w-full sm:w-auto">
-                      <div className="flex-1 sm:w-24">
-                        <label className="block text-xs font-medium text-foreground mb-1">
-                          Unit
-                        </label>
-                        <select
-                          className="input-field w-full"
-                          value={materialItem.unit}
-                          onChange={(e) => handleMaterialChange(index, 'unit', e.target.value as "MT" | "Kg" | "KL")}
-                          required
-                        >
-                          <option value="MT">MT</option>
-                          <option value="Kg">KG</option>
-                          <option value="KL">KL</option>
-                        </select>
-                      </div>
-                      <div className="flex-1 sm:w-32">
-                        <label className="block text-xs font-medium text-foreground mb-1">
-                          Rate (₹/{materialItem.unit})
-                        </label>
-                        <input
-                          type="number"
-                          className="input-field w-full"
-                          placeholder="0.00"
-                          value={materialItem.rate}
-                          onChange={(e) => handleMaterialChange(index, 'rate', e.target.value)}
-                          min="0"
-                          step="0.01"
-                          required
-                        />
-                      </div>
-                      {formData.materials.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeMaterial(index)}
-                          className="text-red-500 hover:text-red-700 p-2 self-end sm:self-auto"
-                          title="Remove material"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <button
+                type="button"
+                onClick={addMaterial}
+                className="text-sm text-primary hover:text-primary/80 font-medium"
+              >
+                + Add Material
+              </button>
             </div>
-          )}
+            <div className="space-y-4">
+              {formData.materials.map((materialItem, index) => (
+                <div key={index} className="flex flex-col sm:flex-row gap-3 items-end p-3 rounded-lg bg-secondary/10 sm:bg-transparent sm:p-0 border border-border sm:border-0">
+                  <div className="w-full sm:flex-1">
+                    <label className="block text-xs font-medium text-foreground mb-1">
+                      Material Name {index + 1}
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field w-full"
+                      placeholder="Enter material type"
+                      value={materialItem.material}
+                      onChange={(e) => handleMaterialChange(index, 'material', e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="flex gap-3 w-full sm:w-auto">
+                    {['admin', 'superadmin'].includes(user?.role || '') && (
+                      <>
+                        <div className="flex-1 sm:w-24">
+                          <label className="block text-xs font-medium text-foreground mb-1">
+                            Unit
+                          </label>
+                          <select
+                            className="input-field w-full"
+                            value={materialItem.unit}
+                            onChange={(e) => handleMaterialChange(index, 'unit', e.target.value as "MT" | "Kg" | "KL")}
+                            required
+                          >
+                            <option value="MT">MT</option>
+                            <option value="Kg">KG</option>
+                            <option value="KL">KL</option>
+                          </select>
+                        </div>
+                        <div className="flex-1 sm:w-32">
+                          <label className="block text-xs font-medium text-foreground mb-1">
+                            Rate (₹)
+                          </label>
+                          <input
+                            type="number"
+                            className={`input-field w-full ${user?.role !== 'superadmin' ? 'bg-muted/50 cursor-not-allowed opacity-75' : ''}`}
+                            placeholder={user?.role === 'superadmin' ? "0.00" : "Pending..."}
+                            value={materialItem.rate}
+                            onChange={(e) => handleMaterialChange(index, 'rate', e.target.value)}
+                            min="0"
+                            step="0.01"
+                            disabled={user?.role !== 'superadmin'}
+                            title={user?.role !== 'superadmin' ? "Only Super Admin can define rates" : ""}
+                          />
+                        </div>
+                      </>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeMaterial(index)}
+                      className="text-red-500 hover:text-red-700 p-2 self-end sm:self-auto"
+                      title="Remove material"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
 
           <div className="flex justify-end gap-3 pt-4">
             <Button

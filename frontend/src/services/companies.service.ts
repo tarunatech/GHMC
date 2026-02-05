@@ -23,7 +23,7 @@ export interface CompanyMaterial {
   id: string;
   companyId: string;
   materialName: string;
-  rate: number;
+  rate: number | null;
   unit: string;
   createdAt: string;
   updatedAt: string;
@@ -38,7 +38,7 @@ export interface CreateCompanyData {
   gstNumber?: string;
   materials?: Array<{
     material: string;
-    rate: number;
+    rate?: number | null;
     unit: 'MT' | 'Kg' | 'KL';
   }>;
 }
@@ -54,13 +54,13 @@ export interface UpdateCompanyData {
 
 export interface AddMaterialData {
   material: string;
-  rate: number;
+  rate?: number | null;
   unit: 'MT' | 'Kg' | 'KL';
 }
 
 export interface UpdateMaterialData {
   material?: string;
-  rate?: number;
+  rate?: number | null;
   unit?: 'MT' | 'Kg' | 'KL';
 }
 
