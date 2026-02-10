@@ -48,6 +48,8 @@ export default function Inward() {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [materialCurrentPage, setMaterialCurrentPage] = useState(1);
+  const [materialPageSize, setMaterialPageSize] = useState(20);
   const [displayedEntriesCount, setDisplayedEntriesCount] = useState(4);
   const [displayedMaterialsCount, setDisplayedMaterialsCount] = useState(4);
 
@@ -86,10 +88,14 @@ export default function Inward() {
   });
 
   // Fetch inward materials
-  const { data: materialsData } = useQuery({
-    queryKey: ['inward-materials'],
-    queryFn: () => inwardMaterialsService.getMaterials({ limit: 100 }),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+  const { data: materialsData, isLoading: isMaterialsLoading, isFetching: isMaterialsFetching } = useQuery({
+    queryKey: ['inward-materials', materialCurrentPage, materialPageSize],
+    queryFn: () => inwardMaterialsService.getMaterials({
+      page: materialCurrentPage,
+      limit: materialPageSize
+    }),
+    staleTime: 1 * 60 * 1000, // 1 minute
+    placeholderData: keepPreviousData,
   });
 
   // Create entry mutation
@@ -151,6 +157,7 @@ export default function Inward() {
   const companies = companiesData?.companies || [];
   const stats = statsData || { totalEntries: 0, totalQuantity: 0, unit: 'MT', totalInvoiced: 0, totalReceived: 0 };
   const materials = materialsData?.materials || [];
+  const materialsPagination = materialsData?.pagination || { page: 1, limit: 20, total: 0, totalPages: 1, hasNext: false, hasPrev: false };
 
   // Reset to page 1 when search changes
   const handleSearchChange = (value: string) => {
@@ -271,7 +278,7 @@ export default function Inward() {
   }, []);
 
   const columns = useMemo(() => [
-    { key: "srNo", header: "Sr No.", render: (_: InwardEntry, index: number) => <span>{index + 1}</span> },
+    { key: "srNo", header: "Sr No.", render: (_: InwardEntry, index: number) => <span>{(currentPage - 1) * pageSize + index + 1}</span> },
     { key: "date", header: "Date", render: (e: InwardEntry) => format(new Date(e.date), 'dd MMM yyyy') },
     { key: "month", header: "Month", render: (e: InwardEntry) => e.month || '-' },
     { key: "lotNo", header: "Lot No.", render: (e: InwardEntry) => e.lotNo || '-' },
@@ -457,7 +464,7 @@ export default function Inward() {
         </div>
       ),
     },
-  ], [handleDelete, handleCreateInvoice, deleteMutation, user]);
+  ], [handleDelete, handleCreateInvoice, deleteMutation, user, currentPage, pageSize]);
 
   return (
     <MainLayout title="Inward Management" subtitle="Manage waste collection entries">
@@ -730,7 +737,7 @@ export default function Inward() {
         <div className="space-y-4">
           <DataTable
             columns={[
-              { key: "srNo", header: "Sr No.", render: (_: any, index: number) => index + 1, className: "w-16" },
+              { key: "srNo", header: "Sr No.", render: (_: any, index: number) => (materialCurrentPage - 1) * materialPageSize + index + 1, className: "w-16" },
               { key: "date", header: "Date", render: (m: InwardMaterial) => m.date ? format(new Date(m.date), 'dd MMM yyyy') : '-' },
               { key: "month", header: "Month", render: (m: any) => m.month || m.inwardEntry?.month || '-' }, // month might be on linked entry or direct
               { key: "transporterName", header: "Transporter" },
@@ -784,6 +791,10 @@ export default function Inward() {
             data={materials}
             keyExtractor={(material) => material.id}
             emptyMessage="No material records found"
+            currentPage={materialsPagination.page}
+            totalPages={materialsPagination.totalPages}
+            onPageChange={(page) => setMaterialCurrentPage(page)}
+            isLoading={isMaterialsLoading || isMaterialsFetching}
             maxHeight="400px"
           />
         </div>

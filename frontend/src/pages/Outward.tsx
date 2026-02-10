@@ -49,6 +49,8 @@ export default function Outward() {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
+  const [materialCurrentPage, setMaterialCurrentPage] = useState(1);
+  const [materialPageSize, setMaterialPageSize] = useState(20);
   const [displayedEntriesCount, setDisplayedEntriesCount] = useState(4);
   const [displayedMaterialsCount, setDisplayedMaterialsCount] = useState(4);
 
@@ -84,10 +86,14 @@ export default function Outward() {
   });
 
   // Fetch outward materials
-  const { data: materialsData } = useQuery({
-    queryKey: ['outward-materials'],
-    queryFn: () => outwardMaterialsService.getMaterials({ limit: 100 }),
-    staleTime: 2 * 60 * 1000, // 2 minutes
+  const { data: materialsData, isLoading: isMaterialsLoading, isFetching: isMaterialsFetching } = useQuery({
+    queryKey: ['outward-materials', materialCurrentPage, materialPageSize],
+    queryFn: () => outwardMaterialsService.getMaterials({
+      page: materialCurrentPage,
+      limit: materialPageSize
+    }),
+    staleTime: 1 * 60 * 1000, // 1 minute
+    placeholderData: keepPreviousData,
   });
 
   // Create entry mutation
@@ -195,6 +201,7 @@ export default function Outward() {
   const transporters = transportersData?.transporters || [];
   const stats = statsData || { totalDispatches: 0, totalQuantity: 0, unit: 'MT', totalInvoiced: 0, totalReceived: 0 };
   const materials = materialsData?.materials || [];
+  const materialsPagination = materialsData?.pagination || { page: 1, limit: 20, total: 0, totalPages: 1, hasNext: false, hasPrev: false };
 
 
   // Reset to page 1 when search changes
@@ -287,7 +294,7 @@ export default function Outward() {
 
 
   const columns = [
-    { key: "srNo", header: "Sr No.", render: (_: OutwardEntry, index: number) => index + 1 },
+    { key: "srNo", header: "Sr No.", render: (_: OutwardEntry, index: number) => (currentPage - 1) * pageSize + index + 1 },
     { key: "month", header: "Month", render: (e: OutwardEntry) => e.month || '-' },
     { key: "date", header: "Date", render: (e: OutwardEntry) => format(new Date(e.date), 'dd MMM yyyy') },
     {
@@ -650,7 +657,7 @@ export default function Outward() {
         <div className="space-y-4">
           <DataTable
             columns={[
-              { key: "srNo", header: "Sr No.", render: (_: any, index: number) => index + 1, className: "w-16" },
+              { key: "srNo", header: "Sr No.", render: (_: any, index: number) => (materialCurrentPage - 1) * materialPageSize + index + 1, className: "w-16" },
               { key: "date", header: "Date", render: (m: OutwardMaterial) => m.date ? format(new Date(m.date), 'dd MMM yyyy') : '-' },
               { key: "month", header: "Month", render: (m: OutwardMaterial) => m.month || m.outwardEntry?.month || '-' },
               { key: "transporterName", header: "Transporter" },
@@ -702,6 +709,10 @@ export default function Outward() {
             data={materials}
             keyExtractor={(material) => material.id}
             emptyMessage="No outward material records found"
+            currentPage={materialsPagination.page}
+            totalPages={materialsPagination.totalPages}
+            onPageChange={(page) => setMaterialCurrentPage(page)}
+            isLoading={isMaterialsLoading || isMaterialsFetching}
             maxHeight="400px"
           />
         </div>
