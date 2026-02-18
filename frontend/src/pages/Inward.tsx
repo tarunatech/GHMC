@@ -98,6 +98,13 @@ export default function Inward() {
     placeholderData: keepPreviousData,
   });
 
+  // Fetch all inward entries for the import dropdown (limit 1000)
+  const { data: allInwardEntriesData } = useQuery({
+    queryKey: ['inward-all-for-dropdown'],
+    queryFn: () => inwardService.getEntries({ limit: 1000 }),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   // Create entry mutation
   const createMutation = useMutation({
     mutationFn: (data: CreateInwardEntryData) => inwardService.createEntry(data),
@@ -865,7 +872,7 @@ export default function Inward() {
       >
         <InwardMaterialForm
           entry={editingMaterial || undefined}
-          inwardEntries={entries}
+          inwardEntries={allInwardEntriesData?.entries || []}
           onCancel={() => {
             setIsMaterialModalOpen(false);
             setEditingMaterial(null);

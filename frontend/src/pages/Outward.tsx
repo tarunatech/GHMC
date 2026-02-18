@@ -96,6 +96,13 @@ export default function Outward() {
     placeholderData: keepPreviousData,
   });
 
+  // Fetch all outward entries for the import dropdown (limit 1000)
+  const { data: allOutwardEntriesData } = useQuery({
+    queryKey: ['outward-all-for-dropdown'],
+    queryFn: () => outwardService.getEntries({ limit: 1000 }),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   // Create entry mutation
   const createMutation = useMutation({
     mutationFn: (data: CreateOutwardEntryData) => outwardService.createEntry(data),
@@ -768,7 +775,7 @@ export default function Outward() {
       >
         <OutwardMaterialForm
           entry={editingMaterial || undefined}
-          outwardEntries={entries}
+          outwardEntries={allOutwardEntriesData?.entries || []}
           onCancel={() => {
             setIsMaterialModalOpen(false);
             setEditingMaterial(null);
