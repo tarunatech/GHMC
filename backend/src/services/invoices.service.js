@@ -9,39 +9,65 @@ import { NotFoundError, ConflictError, ValidationError } from '../utils/errors.j
 class InvoicesService {
   /**
    * Generate invoice number
-   * Format: INV-YYYYMM-XXXX or from settings
+   * Format: INV-YY-YY-XXXX (Financial Year format)
+   * Example: FY 2026-27 -> INV-26-27-0001
+   * @param {Date|string} date - Invoice date to determine FY
+   * @param {object} tx - Prisma transaction object (optional)
    * @returns {Promise<string>} Invoice number
    */
-  async generateInvoiceNo() {
-    // Try to get format from settings
-    const setting = await prisma.setting.findUnique({
-      where: { key: 'invoice_number_format' },
-    });
+  async generateInvoiceNo(date = new Date(), tx = prisma) {
+    const invoiceDate = new Date(date);
+    // Transition strictly from April 1st, 2026
+    const transitionDate = new Date('2026-04-01');
+    let prefix;
 
-    const year = new Date().getFullYear();
-    const month = String(new Date().getMonth() + 1).padStart(2, '0');
+    if (invoiceDate < transitionDate) {
+      // Maintain legacy format until April 1st, 2026
+      // In the legacy system, the prefix was typically 'INV-YYYYMM' literally from settings
+      const setting = await tx.setting.findUnique({
+        where: { key: 'invoice_number_format' },
+      });
+      const year = invoiceDate.getFullYear();
+      const month = String(invoiceDate.getMonth() + 1).padStart(2, '0');
+      prefix = setting?.value || `INV-${year}${month}`;
+    } else {
+      // Apply new Financial Year format from April 1st, 2026
+      const month = invoiceDate.getMonth(); // 0-11
+      const year = invoiceDate.getFullYear();
 
-    // Default format: INV-YYYYMM-XXXX
-    const prefix = setting?.value || `INV-${year}${month}`;
+      let startYear, endYear;
+      if (month < 3) { // Jan, Feb, Mar (0, 1, 2)
+        startYear = year - 1;
+        endYear = year;
+      } else { // Apr to Dec (3-11)
+        startYear = year;
+        endYear = year + 1;
+      }
 
-    // Find last invoice with this prefix
-    const lastInvoice = await prisma.invoice.findFirst({
+      const fyDisplay = `${String(startYear).slice(-2)}-${String(endYear).slice(-2)}`;
+      prefix = `INV-${fyDisplay}`;
+    }
+
+    // Find last invoice with the determined prefix to maintain sequence continuity
+    const lastInvoice = await tx.invoice.findFirst({
       where: {
         invoiceNo: {
           startsWith: prefix,
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { invoiceNo: 'desc' },
       select: { invoiceNo: true },
     });
 
+    let nextNum = 1;
     if (lastInvoice?.invoiceNo) {
       const parts = lastInvoice.invoiceNo.split('-');
-      const lastNum = parseInt(parts[parts.length - 1]) || 0;
-      return `${prefix}-${String(lastNum + 1).padStart(4, '0')}`;
+      const lastNumStr = parts[parts.length - 1];
+      const lastNum = parseInt(lastNumStr) || 0;
+      nextNum = lastNum + 1;
     }
 
-    return `${prefix}-0001`;
+    return `${prefix}-${String(nextNum).padStart(4, '0')}`;
   }
 
   /**
@@ -363,7 +389,7 @@ class InvoicesService {
   async createInvoice(invoiceData) {
     const {
       type,
-      date,
+      date = new Date(),
       companyId,
       transporterId,
       customerName,
@@ -413,153 +439,176 @@ class InvoicesService {
       await this._validateInwardEntries(inwardEntryIds);
     }
 
-    // Generate or use explicit invoice number
-    let invoiceNo = explicitInvoiceNo;
-    if (explicitInvoiceNo) {
-      const existing = await prisma.invoice.findUnique({
-        where: { invoiceNo: explicitInvoiceNo },
-        select: { id: true },
-      });
-      if (existing) {
-        // Link entries to existing invoice and return it
-        if (inwardEntryIds.length > 0) {
-          await prisma.inwardEntry.updateMany({
-            where: { id: { in: inwardEntryIds } },
-            data: { invoiceId: existing.id },
+    // Attempt to create the invoice with thread-safe number generation
+    let attempts = 0;
+    const maxAttempts = 5;
+    let lastError = null;
+
+    while (attempts < maxAttempts) {
+      try {
+        const result = await prisma.$transaction(async (tx) => {
+          // 1. Generate or use explicit invoice number
+          let finalInvoiceNo = explicitInvoiceNo;
+
+          if (explicitInvoiceNo) {
+            const existing = await tx.invoice.findUnique({
+              where: { invoiceNo: explicitInvoiceNo },
+              select: { id: true },
+            });
+            if (existing) {
+              // Link entries to existing invoice and return it
+              if (inwardEntryIds.length > 0) {
+                await tx.inwardEntry.updateMany({
+                  where: { id: { in: inwardEntryIds } },
+                  data: { invoiceId: existing.id },
+                });
+              }
+              if (outwardEntryIds.length > 0) {
+                await tx.outwardEntry.updateMany({
+                  where: { id: { in: outwardEntryIds } },
+                  data: { invoiceId: existing.id },
+                });
+              }
+              return { id: existing.id };
+            }
+          } else {
+            // Generate next available number for the given date's financial year
+            finalInvoiceNo = await this.generateInvoiceNo(date, tx);
+          }
+
+          // 2. Calculate totals
+          const calculatedSubtotal = subtotal || materials.reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0);
+          const initialAdditionalCharges = additionalChargesList.length > 0
+            ? additionalChargesList.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0)
+            : (additionalCharges ? parseFloat(additionalCharges) : 0);
+
+          const rates = await this.getGSTRates();
+          const activeCgstRate = cgstRate !== undefined ? cgstRate : rates.cgst;
+          const activeSgstRate = sgstRate !== undefined ? sgstRate : rates.sgst;
+
+          const baseForTax = calculatedSubtotal + initialAdditionalCharges;
+          const cgst = Math.round((baseForTax * activeCgstRate) / 100);
+          const sgst = Math.round((baseForTax * activeSgstRate) / 100);
+          const grandTotal = parseFloat((baseForTax + cgst + sgst).toFixed(2));
+
+          // 3. Determine status
+          const initialPayment = paymentReceived ? parseFloat(paymentReceived) : 0;
+          const status = this.getStatus(initialPayment, grandTotal);
+
+          // 4. Get customer name if not provided
+          let finalCustomerName = customerName;
+          if (!finalCustomerName) {
+            if (companyId) {
+              const company = await tx.company.findUnique({
+                where: { id: companyId },
+                select: { name: true },
+              });
+              finalCustomerName = company?.name;
+            } else if (transporterId) {
+              const transporter = await tx.transporter.findUnique({
+                where: { id: transporterId },
+                select: { name: true },
+              });
+              finalCustomerName = transporter?.name;
+            }
+          }
+
+          // 5. Create invoice
+          const createdInvoice = await tx.invoice.create({
+            data: {
+              invoiceNo: finalInvoiceNo,
+              type,
+              date: new Date(date),
+              companyId: companyId || null,
+              transporterId: transporterId || null,
+              customerName: finalCustomerName,
+              subtotal: calculatedSubtotal,
+              cgst: cgst,
+              sgst: sgst,
+              grandTotal: grandTotal,
+              paymentReceived: initialPayment,
+              paymentReceivedOn: paymentReceivedOn ? new Date(paymentReceivedOn) : null,
+              status,
+              gstNo: gstNo || null,
+              billedTo: billedTo || null,
+              shippedTo: shippedTo || null,
+              description: description || null,
+              additionalCharges: initialAdditionalCharges,
+              additionalChargesDescription: additionalChargesDescription || null,
+              additionalChargesQuantity: additionalChargesQuantity ? parseFloat(additionalChargesQuantity) : 0,
+              additionalChargesRate: additionalChargesRate ? parseFloat(additionalChargesRate) : 0,
+              additionalChargesUnit: additionalChargesUnit || null,
+              poNo: poNo || null,
+              poDate: poDate ? new Date(poDate) : null,
+              vehicleNo: vehicleNo || null,
+              customKey: customKey || null,
+              customValue: customValue || null,
+              invoiceManifests: {
+                create: manifestNos.map((manifestNo) => ({
+                  manifestNo,
+                })),
+              },
+              invoiceMaterials: {
+                create: [
+                  ...materials.map((material) => ({
+                    materialName: material.materialName,
+                    rate: material.rate ? parseFloat(material.rate) : null,
+                    unit: material.unit || null,
+                    quantity: material.quantity ? parseFloat(material.quantity) : null,
+                    amount: material.amount ? parseFloat(material.amount) : null,
+                    manifestNo: material.manifestNo || null,
+                    description: material.description || null,
+                    isAdditionalCharge: false,
+                  })),
+                  ...additionalChargesList.map((charge) => ({
+                    materialName: charge.description || 'Additional Charge',
+                    rate: charge.rate ? parseFloat(charge.rate) : null,
+                    unit: charge.unit || null,
+                    quantity: charge.quantity ? parseFloat(charge.quantity) : null,
+                    amount: charge.amount ? parseFloat(charge.amount) : null,
+                    description: charge.description || null,
+                    isAdditionalCharge: true,
+                  })),
+                ],
+              },
+            },
           });
-        }
-        if (outwardEntryIds.length > 0) {
-          await prisma.outwardEntry.updateMany({
-            where: { id: { in: outwardEntryIds } },
-            data: { invoiceId: existing.id },
-          });
-        }
-        return this.getInvoiceById(existing.id);
-      }
-    } else {
-      invoiceNo = await this.generateInvoiceNo();
-    }
 
-    // Calculate totals
-    const calculatedSubtotal = subtotal || materials.reduce((sum, m) => sum + (parseFloat(m.amount) || 0), 0);
-    const initialAdditionalCharges = additionalChargesList.length > 0
-      ? additionalChargesList.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0)
-      : (additionalCharges ? parseFloat(additionalCharges) : 0);
-    const totals = await this.calculateTotals(calculatedSubtotal, { cgstRate, sgstRate, additionalCharges: initialAdditionalCharges });
+          // 6. Update related entries with invoice ID
+          if (inwardEntryIds.length > 0) {
+            await tx.inwardEntry.updateMany({
+              where: { id: { in: inwardEntryIds } },
+              data: { invoiceId: createdInvoice.id },
+            });
+          }
 
-    // Determine status
-    const initialPayment = paymentReceived ? parseFloat(paymentReceived) : 0;
-    const status = this.getStatus(initialPayment, totals.grandTotal);
+          if (outwardEntryIds.length > 0) {
+            await tx.outwardEntry.updateMany({
+              where: { id: { in: outwardEntryIds } },
+              data: { invoiceId: createdInvoice.id },
+            });
+          }
 
-    // Get company/transporter info for customer name
-    let finalCustomerName = customerName;
-    if (!finalCustomerName) {
-      if (companyId) {
-        const company = await prisma.company.findUnique({
-          where: { id: companyId },
-          select: { name: true },
+          return { id: createdInvoice.id };
+        }, {
+          isolationLevel: 'Serializable'
         });
-        finalCustomerName = company?.name;
-      } else if (transporterId) {
-        const transporter = await prisma.transporter.findUnique({
-          where: { id: transporterId },
-          select: { name: true },
-        });
-        finalCustomerName = transporter?.name;
+
+        // Fetch and return the fully populated invoice
+        return this.getInvoiceById(result.id);
+      } catch (error) {
+        // Handle unique constraint violation for invoiceNo (P2002)
+        if (error.code === 'P2002' && error.meta?.target?.includes('invoice_no')) {
+          attempts++;
+          lastError = error;
+          await new Promise(resolve => setTimeout(resolve, 50 * attempts));
+          continue;
+        }
+        throw error;
       }
     }
 
-    // Create invoice with related data
-    const invoice = await prisma.invoice.create({
-      data: {
-        invoiceNo,
-        type,
-        date: new Date(date),
-        companyId: companyId || null,
-        transporterId: transporterId || null,
-        customerName: finalCustomerName,
-        subtotal: calculatedSubtotal,
-        cgst: totals.cgst,
-        sgst: totals.sgst,
-        grandTotal: totals.grandTotal,
-        paymentReceived: initialPayment,
-        paymentReceivedOn: paymentReceivedOn ? new Date(paymentReceivedOn) : null,
-        status,
-        gstNo: gstNo || null,
-        billedTo: billedTo || null,
-        shippedTo: shippedTo || null,
-        description: description || null,
-        additionalCharges: initialAdditionalCharges,
-        additionalChargesDescription: additionalChargesDescription || null,
-        additionalChargesQuantity: additionalChargesQuantity ? parseFloat(additionalChargesQuantity) : 0,
-        additionalChargesRate: additionalChargesRate ? parseFloat(additionalChargesRate) : 0,
-        additionalChargesUnit: additionalChargesUnit || null,
-        poNo: poNo || null,
-        poDate: poDate ? new Date(poDate) : null,
-        vehicleNo: vehicleNo || null,
-        customKey: customKey || null,
-        customValue: customValue || null,
-        invoiceManifests: {
-          create: manifestNos.map((manifestNo) => ({
-            manifestNo,
-          })),
-        },
-        invoiceMaterials: {
-          create: [
-            ...materials.map((material) => ({
-              materialName: material.materialName,
-              rate: material.rate ? parseFloat(material.rate) : null,
-              unit: material.unit || null,
-              quantity: material.quantity ? parseFloat(material.quantity) : null,
-              amount: material.amount ? parseFloat(material.amount) : null,
-              manifestNo: material.manifestNo || null,
-              description: material.description || null,
-              isAdditionalCharge: false,
-            })),
-            ...additionalChargesList.map((charge) => ({
-              materialName: charge.description || 'Additional Charge',
-              rate: charge.rate ? parseFloat(charge.rate) : null,
-              unit: charge.unit || null,
-              quantity: charge.quantity ? parseFloat(charge.quantity) : null,
-              amount: charge.amount ? parseFloat(charge.amount) : null,
-              description: charge.description || null,
-              isAdditionalCharge: true,
-            })),
-          ],
-        },
-      },
-      include: {
-        company: true,
-        transporter: true,
-        invoiceManifests: true,
-        invoiceMaterials: true,
-      },
-    });
-
-    // Update related entries with invoice ID
-    if (inwardEntryIds.length > 0) {
-      await prisma.inwardEntry.updateMany({
-        where: {
-          id: { in: inwardEntryIds },
-        },
-        data: {
-          invoiceId: invoice.id,
-        },
-      });
-    }
-
-    if (outwardEntryIds.length > 0) {
-      await prisma.outwardEntry.updateMany({
-        where: {
-          id: { in: outwardEntryIds },
-        },
-        data: {
-          invoiceId: invoice.id,
-        },
-      });
-    }
-
-    return this.getInvoiceById(invoice.id);
+    throw lastError || new Error('Failed to create invoice after multiple attempts due to numbering conflicts');
   }
 
   /**
