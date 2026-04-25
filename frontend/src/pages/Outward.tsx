@@ -868,7 +868,7 @@ function OutwardEntryForm({ transporters, entry, onCancel, onSubmit, isLoading }
     wasteName: entry?.wasteName || "",
     quantity: entry?.quantity ? String(entry.quantity) : "",
     unit: (entry?.unit as "MT" | "Kg" | "KL") || "MT",
-    month: entry?.month || "",
+    month: entry?.month || (entry?.date ? format(new Date(entry.date), 'MMMM yyyy') : format(new Date(), 'MMMM yyyy')),
     location: entry?.location || "",
     packing: entry?.packing || "",
     rate: entry?.rate ? String(entry.rate) : "",
@@ -881,6 +881,23 @@ function OutwardEntryForm({ transporters, entry, onCancel, onSubmit, isLoading }
     dueOn: entry?.dueOn ? format(new Date(entry.dueOn), 'yyyy-MM-dd') : "",
     invoiceNo: entry?.invoice?.invoiceNo || "",
   });
+
+  // Auto-populate month when date changes
+  useEffect(() => {
+    if (formData.date) {
+      try {
+        const dateObj = new Date(formData.date);
+        if (!isNaN(dateObj.getTime())) {
+          const formattedMonth = format(dateObj, 'MMMM yyyy');
+          if (formData.month !== formattedMonth) {
+            setFormData(prev => ({ ...prev, month: formattedMonth }));
+          }
+        }
+      } catch (e) {
+        // ignore invalid date
+      }
+    }
+  }, [formData.date]);
 
   // Auto-calculate Amount = Quantity * Rate
   useEffect(() => {

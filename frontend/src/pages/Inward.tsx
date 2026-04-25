@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/useDebounce";
 import { MainLayout } from "@/components/layout/MainLayout";
@@ -990,10 +990,27 @@ function InwardEntryForm({ companies, entry, onCancel, onSubmit, isLoading }: an
     category: entry?.category || "Solid",
     quantity: entry?.quantity ? String(entry.quantity) : "",
     unit: (entry?.unit as "MT" | "Kg" | "KL") || "Kg",
-    month: entry?.month || "",
+    month: entry?.month || (entry?.date ? format(new Date(entry.date), 'MMMM yyyy') : format(new Date(), 'MMMM yyyy')),
     lotNo: entry?.lotNo || "",
     remarks: entry?.remarks || "",
   });
+
+  // Auto-populate month when date changes
+  useEffect(() => {
+    if (formData.date) {
+      try {
+        const dateObj = new Date(formData.date);
+        if (!isNaN(dateObj.getTime())) {
+          const formattedMonth = format(dateObj, 'MMMM yyyy');
+          if (formData.month !== formattedMonth) {
+            setFormData(prev => ({ ...prev, month: formattedMonth }));
+          }
+        }
+      } catch (e) {
+        // ignore invalid date
+      }
+    }
+  }, [formData.date]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

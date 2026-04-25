@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { format } from "date-fns";
 import { InwardMaterial, CreateInwardMaterialData } from "@/services/inward.service";
 import transportersService from "@/services/transporters.service";
 import { useQuery } from "@tanstack/react-query";
@@ -24,7 +25,7 @@ export default function InwardMaterialForm({ onCancel, onSubmit, entry, inwardEn
     lotNo: entry?.lotNo ?? undefined,
     companyId: entry?.companyId ?? undefined,
     manifestNo: entry?.manifestNo ?? undefined,
-    month: entry?.month ?? undefined,
+    month: entry?.month ?? (entry?.date ? format(new Date(entry.date), 'MMMM yyyy') : format(new Date(), 'MMMM yyyy')),
     vehicleNo: entry?.vehicleNo ?? undefined,
     wasteName: entry?.wasteName ?? undefined,
     category: entry?.category ?? undefined,
@@ -40,6 +41,23 @@ export default function InwardMaterialForm({ onCancel, onSubmit, entry, inwardEn
     grossAmount: (entry?.grossAmount !== null && entry?.grossAmount !== undefined) ? Number(entry.grossAmount) : undefined,
     paidOn: entry?.paidOn ? new Date(entry.paidOn).toISOString().slice(0, 10) : undefined,
   });
+
+  // Auto-populate month when date changes
+  useEffect(() => {
+    if (formData.date) {
+      try {
+        const dateObj = new Date(formData.date);
+        if (!isNaN(dateObj.getTime())) {
+          const formattedMonth = format(dateObj, 'MMMM yyyy');
+          if (formData.month !== formattedMonth) {
+            setFormData(prev => ({ ...prev, month: formattedMonth }));
+          }
+        }
+      } catch (e) {
+        // ignore invalid date
+      }
+    }
+  }, [formData.date]);
 
   // Reset form when entry changes (critical for edit mode)
   useEffect(() => {

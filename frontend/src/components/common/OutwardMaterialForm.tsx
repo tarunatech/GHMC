@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { format } from "date-fns";
 import { OutwardMaterial, CreateOutwardMaterialData } from "@/services/outward.service";
 import transportersService from "@/services/transporters.service";
 import { useQuery } from "@tanstack/react-query";
@@ -25,7 +26,7 @@ export default function OutwardMaterialForm({ onCancel, onSubmit, entry, outward
         vehicleNo: entry?.vehicleNo ?? undefined,
         wasteName: entry?.wasteName ?? undefined,
         quantity: (entry?.quantity !== null && entry?.quantity !== undefined) ? Number(entry.quantity) : undefined,
-        month: entry?.month ?? undefined,
+        month: entry?.month ?? (entry?.date ? format(new Date(entry.date), 'MMMM yyyy') : format(new Date(), 'MMMM yyyy')),
         unit: (entry?.unit as "MT" | "Kg" | "KL") ?? undefined,
         transporterName: entry?.transporterName ?? '',
         invoiceNo: entry?.invoiceNo ?? undefined,
@@ -37,6 +38,23 @@ export default function OutwardMaterialForm({ onCancel, onSubmit, entry, outward
         grossAmount: (entry?.grossAmount !== null && entry?.grossAmount !== undefined) ? Number(entry.grossAmount) : undefined,
         paidOn: entry?.paidOn ? new Date(entry.paidOn).toISOString().slice(0, 10) : undefined,
     });
+
+    // Auto-populate month when date changes
+    useEffect(() => {
+        if (formData.date) {
+            try {
+                const dateObj = new Date(formData.date);
+                if (!isNaN(dateObj.getTime())) {
+                    const formattedMonth = format(dateObj, 'MMMM yyyy');
+                    if (formData.month !== formattedMonth) {
+                        setFormData(prev => ({ ...prev, month: formattedMonth }));
+                    }
+                }
+            } catch (e) {
+                // ignore invalid date
+            }
+        }
+    }, [formData.date]);
 
     // Reset form when entry changes (critical for edit mode)
     useEffect(() => {
