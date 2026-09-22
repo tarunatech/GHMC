@@ -420,6 +420,20 @@ export const updateInvoicePaymentSchema = Joi.object({
   paymentReceivedOn: Joi.date().optional().allow(null),
 });
 
+export const cancelInvoiceSchema = Joi.object({
+  cancellationReason: Joi.string()
+    .trim()
+    .min(3)
+    .max(500)
+    .required()
+    .messages({
+      'string.empty': 'Cancellation reason is required',
+      'string.min': 'Cancellation reason must be at least 3 characters',
+      'string.max': 'Cancellation reason cannot exceed 500 characters',
+      'any.required': 'Cancellation reason is required',
+    }),
+});
+
 /**
  * Validation middleware factory
  * @param {Joi.Schema} schema - Joi validation schema

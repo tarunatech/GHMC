@@ -865,6 +865,10 @@ class InvoicesService {
   async updatePayment(invoiceId, paymentData) {
     const invoice = await this.getInvoiceById(invoiceId);
 
+    if (invoice.status === 'cancelled') {
+      throw new ValidationError('Cannot record payment for a cancelled invoice');
+    }
+
     const { paymentReceived, paymentReceivedOn } = paymentData;
 
     const newPaymentReceived = parseFloat(paymentReceived) || 0;
@@ -884,6 +888,146 @@ class InvoicesService {
     });
 
     return updatedInvoice;
+  }
+
+  /**
+   * Cancel invoice
+   * @param {string} invoiceId - Invoice ID
+   * @param {object} options - Cancellation options ({ cancellationReason, userId })
+   * @returns {Promise<object>} Cancelled invoice
+   */
+  async cancelInvoice(invoiceId, options = {}) {
+    const { cancellationReason, userId } = options;
+
+    if (!cancellationReason || !cancellationReason.trim()) {
+      throw new ValidationError('Cancellation reason is required');
+    }
+
+    const invoice = await this.getInvoiceById(invoiceId);
+    if (!invoice) {
+      throw new NotFoundError('Invoice');
+    }
+
+    if (invoice.status === 'cancelled') {
+      throw new ConflictError('Invoice is already cancelled');
+    }
+
+    const cancelledInvoice = await prisma.$transaction(async (tx) => {
+      // 1. Soft cancel invoice with metadata
+      const updated = await tx.invoice.update({
+        where: { id: invoiceId },
+        data: {
+          status: 'cancelled',
+          cancelledAt: new Date(),
+          cancellationReason: cancellationReason.trim(),
+          cancelledBy: userId || null,
+        },
+        include: {
+          company: true,
+          transporter: true,
+          invoiceManifests: true,
+          invoiceMaterials: true,
+          inwardEntries: true,
+          outwardEntries: true,
+        },
+      });
+
+      // 2. Safe Entry Release Logic for Inward Entries:
+      // An inward entry is only released (invoiceId = null) if it is NOT referenced/claimed
+      // by any other active (status !== 'cancelled') invoice.
+      const linkedInwardEntries = await tx.inwardEntry.findMany({
+        where: { invoiceId },
+        select: { id: true, manifestNo: true },
+      });
+
+      const inwardToReleaseIds = [];
+      for (const entry of linkedInwardEntries) {
+        let isClaimedByOtherActive = false;
+        if (entry.manifestNo) {
+          const activeManifestMatch = await tx.invoiceManifest.findFirst({
+            where: {
+              manifestNo: entry.manifestNo,
+              invoiceId: { not: invoiceId },
+              invoice: { status: { not: 'cancelled' } },
+            },
+          });
+          if (activeManifestMatch) {
+            isClaimedByOtherActive = true;
+          } else {
+            const activeMaterialMatch = await tx.invoiceMaterial.findFirst({
+              where: {
+                manifestNo: entry.manifestNo,
+                invoiceId: { not: invoiceId },
+                invoice: { status: { not: 'cancelled' } },
+              },
+            });
+            if (activeMaterialMatch) {
+              isClaimedByOtherActive = true;
+            }
+          }
+        }
+
+        if (!isClaimedByOtherActive) {
+          inwardToReleaseIds.push(entry.id);
+        }
+      }
+
+      if (inwardToReleaseIds.length > 0) {
+        await tx.inwardEntry.updateMany({
+          where: { id: { in: inwardToReleaseIds } },
+          data: { invoiceId: null },
+        });
+      }
+
+      // 3. Safe Entry Release Logic for Outward Entries:
+      const linkedOutwardEntries = await tx.outwardEntry.findMany({
+        where: { invoiceId },
+        select: { id: true, manifestNo: true },
+      });
+
+      const outwardToReleaseIds = [];
+      for (const entry of linkedOutwardEntries) {
+        let isClaimedByOtherActive = false;
+        if (entry.manifestNo) {
+          const activeManifestMatch = await tx.invoiceManifest.findFirst({
+            where: {
+              manifestNo: entry.manifestNo,
+              invoiceId: { not: invoiceId },
+              invoice: { status: { not: 'cancelled' } },
+            },
+          });
+          if (activeManifestMatch) {
+            isClaimedByOtherActive = true;
+          } else {
+            const activeMaterialMatch = await tx.invoiceMaterial.findFirst({
+              where: {
+                manifestNo: entry.manifestNo,
+                invoiceId: { not: invoiceId },
+                invoice: { status: { not: 'cancelled' } },
+              },
+            });
+            if (activeMaterialMatch) {
+              isClaimedByOtherActive = true;
+            }
+          }
+        }
+
+        if (!isClaimedByOtherActive) {
+          outwardToReleaseIds.push(entry.id);
+        }
+      }
+
+      if (outwardToReleaseIds.length > 0) {
+        await tx.outwardEntry.updateMany({
+          where: { id: { in: outwardToReleaseIds } },
+          data: { invoiceId: null },
+        });
+      }
+
+      return updated;
+    });
+
+    return cancelledInvoice;
   }
 
   /**
@@ -924,6 +1068,11 @@ class InvoicesService {
       where.type = type;
     }
 
+    const whereActive = {
+      ...where,
+      status: { not: 'cancelled' },
+    };
+
     const [
       totalInvoices,
       totalInvoiced,
@@ -933,15 +1082,15 @@ class InvoicesService {
     ] = await Promise.all([
       prisma.invoice.count({ where }),
       prisma.invoice.aggregate({
-        where,
+        where: whereActive,
         _sum: { grandTotal: true },
       }),
       prisma.invoice.aggregate({
-        where,
+        where: whereActive,
         _sum: { paymentReceived: true },
       }),
       prisma.invoice.groupBy({
-        where,
+        where: whereActive,
         by: ['type'],
         _sum: {
           grandTotal: true,

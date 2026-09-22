@@ -238,7 +238,8 @@ class TransportersService {
     const transporterInvoices = await prisma.invoice.findMany({
       where: {
         transporterId,
-        type: 'Transporter'
+        type: 'Transporter',
+        status: { not: 'cancelled' },
       },
       select: {
         grandTotal: true,

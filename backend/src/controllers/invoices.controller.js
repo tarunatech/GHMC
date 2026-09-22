@@ -142,6 +142,32 @@ class InvoicesController {
   }
 
   /**
+   * Cancel invoice
+   * POST /api/invoices/:id/cancel
+   */
+  async cancelInvoice(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { cancellationReason } = req.body;
+      const userId = req.user?.id;
+
+      const invoice = await invoicesService.cancelInvoice(id, {
+        cancellationReason,
+        userId,
+      });
+
+      res.json({
+        success: true,
+        message: 'Invoice cancelled successfully',
+        data: { invoice },
+      });
+    } catch (error) {
+      logger.error('Error cancelling invoice:', error);
+      next(error);
+    }
+  }
+
+  /**
    * Delete invoice
    * DELETE /api/invoices/:id
    */

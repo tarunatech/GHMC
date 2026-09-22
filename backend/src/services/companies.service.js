@@ -335,6 +335,7 @@ class CompaniesService {
         invoices: {
           where: {
             type: 'Inward',
+            status: { not: 'cancelled' },
           },
           select: {
             grandTotal: true,
@@ -367,6 +368,7 @@ class CompaniesService {
     const invoices = await prisma.invoice.findMany({
       where: {
         type: 'Inward',
+        status: { not: 'cancelled' },
       },
       select: {
         grandTotal: true,

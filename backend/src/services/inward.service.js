@@ -454,7 +454,8 @@ class InwardService {
     if (invoiceIds.length > 0) {
       const invoices = await prisma.invoice.findMany({
         where: {
-          id: { in: invoiceIds }
+          id: { in: invoiceIds },
+          status: { not: 'cancelled' },
         },
         select: {
           grandTotal: true,
