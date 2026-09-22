@@ -2,7 +2,7 @@ import express from 'express';
 import invoicesController from '../controllers/invoices.controller.js';
 import { authenticate } from '../middleware/auth.middleware.js';
 import { authorize } from '../middleware/role.middleware.js';
-import { validate, createInvoiceSchema, updateInvoiceSchema, updateInvoicePaymentSchema } from '../utils/validators.js';
+import { validate, createInvoiceSchema, updateInvoiceSchema, updateInvoicePaymentSchema, cancelInvoiceSchema } from '../utils/validators.js';
 import multer from 'multer';
 
 const router = express.Router();
@@ -47,6 +47,15 @@ router.put(
   authorize(['superadmin']),
   validate(updateInvoicePaymentSchema),
   invoicesController.updatePayment.bind(invoicesController)
+);
+
+// Cancel invoice
+router.post(
+  '/:id/cancel',
+  authenticate,
+  authorize(['superadmin']),
+  validate(cancelInvoiceSchema),
+  invoicesController.cancelInvoice.bind(invoicesController)
 );
 
 // Delete invoice

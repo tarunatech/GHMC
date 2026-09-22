@@ -42,6 +42,7 @@ class DashboardService {
       prisma.invoice.aggregate({
         where: {
           type: 'Inward',
+          status: { not: 'cancelled' },
           date: {
             gte: startOfMonth,
           },
@@ -54,6 +55,7 @@ class DashboardService {
       prisma.invoice.aggregate({
         where: {
           type: 'Inward',
+          status: { not: 'cancelled' },
         },
         _sum: {
           grandTotal: true,
@@ -144,6 +146,7 @@ class DashboardService {
     const invoices = await prisma.invoice.findMany({
       where: {
         type: 'Inward',
+        status: { not: 'cancelled' },
         date: {
           gte: startOfYear,
           lte: endOfYear,
@@ -196,6 +199,7 @@ class DashboardService {
     const invoices = await prisma.invoice.aggregate({
       where: {
         type: 'Inward',
+        status: { not: 'cancelled' },
       },
       _sum: {
         grandTotal: true,
@@ -283,6 +287,7 @@ class DashboardService {
       prisma.invoice.findMany({
         where: {
           type: 'Inward',
+          status: { not: 'cancelled' },
           paymentReceived: {
             gt: 0,
           },

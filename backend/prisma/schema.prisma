@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -214,6 +215,9 @@ model Invoice {
   vehicleNo                    String?           @map("vehicle_no")
   customKey                    String?           @map("custom_key")
   customValue                  String?           @map("custom_value")
+  cancelledAt                  DateTime?         @map("cancelled_at")
+  cancellationReason           String?           @map("cancellation_reason")
+  cancelledBy                  String?           @map("cancelled_by")
   createdAt                    DateTime          @default(now()) @map("created_at")
   updatedAt                    DateTime          @updatedAt @map("updated_at")
   additionalCharges            Decimal?          @default(0) @map("additional_charges") @db.Decimal(10, 2)

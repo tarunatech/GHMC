@@ -18,8 +18,11 @@ export interface Invoice {
   additionalChargesUnit?: string;
   grandTotal: number;
   paymentReceived: number;
-  paymentReceivedOn: string | null;
-  status: 'paid' | 'pending' | 'partial';
+  paymentReceivedOn?: string | null;
+  status: 'paid' | 'pending' | 'partial' | 'cancelled';
+  cancelledAt?: string | null;
+  cancellationReason?: string | null;
+  cancelledBy?: string | null;
   gstNo: string | null;
   billedTo: string | null;
   shippedTo: string | null;
@@ -244,6 +247,16 @@ class InvoicesService {
    */
   async updatePayment(id: string, paymentData: UpdatePaymentData): Promise<Invoice> {
     const response = await apiClient.put<ApiResponse<{ invoice: Invoice }>>(`/invoices/${id}/payment`, paymentData);
+    return response.data.data.invoice;
+  }
+
+  /**
+   * Cancel invoice
+   */
+  async cancelInvoice(id: string, cancellationReason: string): Promise<Invoice> {
+    const response = await apiClient.post<ApiResponse<{ invoice: Invoice }>>(`/invoices/${id}/cancel`, {
+      cancellationReason,
+    });
     return response.data.data.invoice;
   }
 

@@ -87,7 +87,14 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   // --- Title ---
   doc.setFontSize(12);
   doc.setFont('helvetica', 'bold');
-  doc.text('TAX INVOICE', 105, 38, { align: 'center' });
+  const isCancelled = (invoiceData.status || '').toLowerCase() === 'cancelled';
+  if (isCancelled) {
+    doc.setTextColor('#DC2626');
+    doc.text('TAX INVOICE (CANCELLED)', 105, 38, { align: 'center' });
+    doc.setTextColor(blackColor);
+  } else {
+    doc.text('TAX INVOICE', 105, 38, { align: 'center' });
+  }
   doc.line(10, 40, 200, 40);
 
   // --- Invoice Details Grid ---
@@ -452,8 +459,13 @@ export const generateInvoicePDF = async (invoiceData: any) => {
   doc.setFont('helvetica', 'normal');
   doc.text('Authorised Signatory', 152.5, finalY + 36, { align: 'center' });
 
-  // Bottom text removed as requested: This is computergenerated invoice
-  // doc.text('This is computergenerated invoice', 105, finalY + footerHeight + 4, { align: 'center' });
+  if (isCancelled) {
+    doc.setTextColor('#DC2626');
+    doc.setFontSize(40);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CANCELLED', 105, 150, { align: 'center', angle: 35 });
+    doc.setTextColor(blackColor);
+  }
 
   // Save PDF
   doc.save(`Invoice_${invoiceData.invoiceNo}.pdf`);

@@ -1,18 +1,42 @@
 import { useState, useMemo, useCallback } from "react";
-import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/useDebounce";
 import { MainLayout } from "@/components/layout/MainLayout";
 import { DataTable } from "@/components/common/DataTable";
 import { Modal } from "@/components/common/Modal";
 import { StatusBadge } from "@/components/common/StatusBadge";
-import { Search, Filter, Download, Eye, FileText, Plus, Trash2, Loader2, Edit } from "lucide-react";
-import invoicesService, { Invoice, CreateInvoiceData, InvoiceStats } from "@/services/invoices.service";
+import {
+  Search,
+  Filter,
+  Download,
+  Eye,
+  FileText,
+  Plus,
+  Trash2,
+  Loader2,
+  Edit,
+  Ban,
+} from "lucide-react";
+import invoicesService, {
+  Invoice,
+  CreateInvoiceData,
+  InvoiceStats,
+} from "@/services/invoices.service";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
 import CreateInvoiceModal from "@/components/common/CreateInvoiceModal";
 import { ConfirmDialog } from "@/components/common/ConfirmDialog";
-import { exportToCSV, formatDateForExport, formatCurrencyForExport } from "@/utils/export";
+import {
+  exportToCSV,
+  formatDateForExport,
+  formatCurrencyForExport,
+} from "@/utils/export";
 import { generateInvoicePDF } from "@/utils/pdfGenerator";
 import { getErrorMessage, logError } from "@/utils/errorHandler";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,79 +52,153 @@ export default function Invoices() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [paymentEditOpen, setPaymentEditOpen] = useState(false);
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
-  const [invoiceType, setInvoiceType] = useState<'Inward' | 'Outward' | 'Transporter'>('Inward');
+  const [invoiceType, setInvoiceType] = useState<
+    "Inward" | "Outward" | "Transporter"
+  >("Inward");
   const [paymentForm, setPaymentForm] = useState({
     paymentReceived: 0,
     paymentReceivedOn: "",
   });
-  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; id: string | null }>({
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    id: string | null;
+  }>({
     isOpen: false,
     id: null,
   });
+  const [cancelConfirm, setCancelConfirm] = useState<{
+    isOpen: boolean;
+    invoice: Invoice | null;
+  }>({
+    isOpen: false,
+    invoice: null,
+  });
+  const [cancellationReason, setCancellationReason] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
 
   // Fetch invoices (use debounced search term with pagination)
-  const { data, isLoading, isFetching, error } = useQuery<{ invoices: Invoice[]; pagination: any }>({
-    queryKey: ['invoices', debouncedSearchTerm, currentPage, pageSize, 'Inward'],
-    queryFn: () => invoicesService.getInvoices({
-      type: 'Inward',
-      search: debouncedSearchTerm || undefined,
-      page: currentPage,
-      limit: pageSize,
-    }),
+  const { data, isLoading, isFetching, error } = useQuery<{
+    invoices: Invoice[];
+    pagination: any;
+  }>({
+    queryKey: [
+      "invoices",
+      debouncedSearchTerm,
+      currentPage,
+      pageSize,
+      "Inward",
+    ],
+    queryFn: () =>
+      invoicesService.getInvoices({
+        type: "Inward",
+        search: debouncedSearchTerm || undefined,
+        page: currentPage,
+        limit: pageSize,
+      }),
     staleTime: 2 * 60 * 1000, // 2 minutes
     placeholderData: keepPreviousData,
   });
 
   // Fetch statistics (cache for longer)
   const { data: statsData } = useQuery<InvoiceStats>({
-    queryKey: ['invoice-stats', 'Inward'],
-    queryFn: () => invoicesService.getStats('Inward'),
+    queryKey: ["invoice-stats", "Inward"],
+    queryFn: () => invoicesService.getStats("Inward"),
     staleTime: 0, // Always fetch fresh stats
     refetchInterval: 10000,
   });
 
   // Update payment mutation
   const updatePaymentMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => invoicesService.updatePayment(id, data),
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      invoicesService.updatePayment(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['invoice-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-revenue'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-payment-status'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-recent-activity'] });
-      toast.success('Payment updated successfully');
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-revenue"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-payment-status"] });
+      queryClient.invalidateQueries({
+        queryKey: ["dashboard-recent-activity"],
+      });
+      toast.success("Payment updated successfully");
       setPaymentEditOpen(false);
       setSelectedInvoice(null);
     },
     onError: (error: any) => {
-      logError('Updating payment', error);
-      toast.error(getErrorMessage(error, 'Failed to update payment'));
+      logError("Updating payment", error);
+      toast.error(getErrorMessage(error, "Failed to update payment"));
     },
   });
+
+  // Cancel invoice mutation
+  const cancelMutation = useMutation({
+    mutationFn: ({ id, reason }: { id: string; reason: string }) =>
+      invoicesService.cancelInvoice(id, reason),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["inward"] });
+      queryClient.invalidateQueries({ queryKey: ["outward"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-revenue"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-payment-status"] });
+      queryClient.invalidateQueries({
+        queryKey: ["dashboard-recent-activity"],
+      });
+      toast.success("Invoice cancelled successfully");
+      setCancelConfirm({ isOpen: false, invoice: null });
+      setCancellationReason("");
+      setSelectedInvoice(null);
+    },
+    onError: (error: any) => {
+      logError("Cancelling invoice", error);
+      toast.error(getErrorMessage(error, "Failed to cancel invoice"));
+    },
+  });
+
+  const handleCancelClick = useCallback((invoice: Invoice) => {
+    setCancelConfirm({ isOpen: true, invoice });
+    setCancellationReason("");
+  }, []);
+
+  const confirmCancel = useCallback(() => {
+    if (!cancelConfirm.invoice || cancellationReason.trim().length < 3) return;
+    cancelMutation.mutate({
+      id: cancelConfirm.invoice.id,
+      reason: cancellationReason.trim(),
+    });
+  }, [cancelConfirm, cancellationReason, cancelMutation]);
 
   // Delete invoice mutation
   const deleteMutation = useMutation({
     mutationFn: (id: string) => invoicesService.deleteInvoice(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['invoice-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-revenue'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-payment-status'] });
-      queryClient.invalidateQueries({ queryKey: ['dashboard-recent-activity'] });
-      toast.success('Invoice deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      queryClient.invalidateQueries({ queryKey: ["invoice-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-stats"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-revenue"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-payment-status"] });
+      queryClient.invalidateQueries({
+        queryKey: ["dashboard-recent-activity"],
+      });
+      toast.success("Invoice deleted successfully");
     },
     onError: (error: any) => {
-      logError('Deleting invoice', error);
-      toast.error(getErrorMessage(error, 'Failed to delete invoice'));
+      logError("Deleting invoice", error);
+      toast.error(getErrorMessage(error, "Failed to delete invoice"));
     },
   });
 
   const invoices = data?.invoices || [];
-  const pagination = data?.pagination || { page: 1, limit: 20, total: 0, totalPages: 1, hasNext: false, hasPrev: false };
+  const pagination = data?.pagination || {
+    page: 1,
+    limit: 20,
+    total: 0,
+    totalPages: 1,
+    hasNext: false,
+    hasPrev: false,
+  };
   const stats = statsData || {
     totalInvoices: 0,
     totalInvoiced: 0,
@@ -144,8 +242,12 @@ export default function Invoices() {
         vehicleNo = (fullInvoice.inwardEntries[0] as any).vehicleNo;
       }
 
-      const materials = (fullInvoice.invoiceMaterials || []).filter(m => !(m as any).isAdditionalCharge);
-      const additionalChargesList = (fullInvoice.invoiceMaterials || []).filter(m => (m as any).isAdditionalCharge);
+      const materials = (fullInvoice.invoiceMaterials || []).filter(
+        (m) => !(m as any).isAdditionalCharge,
+      );
+      const additionalChargesList = (fullInvoice.invoiceMaterials || []).filter(
+        (m) => (m as any).isAdditionalCharge,
+      );
 
       const pdfData = {
         invoiceNo: fullInvoice.invoiceNo,
@@ -155,49 +257,60 @@ export default function Invoices() {
         vehicleNo: fullInvoice.vehicleNo || vehicleNo,
         customKey: fullInvoice.customKey,
         customValue: fullInvoice.customValue,
-        customerName: fullInvoice.customerName || fullInvoice.company?.name || '',
-        customerAddress: fullInvoice.billedTo || '',
-        customerGst: fullInvoice.gstNo || fullInvoice.company?.gstNumber || '',
-        description: fullInvoice.description || '',
-        items: materials.length > 0
-          ? materials.map(m => ({
-            description: (m as any).description || '',
-            materialName: m.materialName,
-            manifestNo: (m as any).manifestNo || '',
-            hsnCode: (m as any).hsnCode || '999432',
-            quantity: m.quantity,
-            unit: m.unit,
-            rate: m.rate,
-            amount: m.amount
-          }))
-          : (fullInvoice.inwardEntries && fullInvoice.inwardEntries.length > 0)
-            ? fullInvoice.inwardEntries.map(e => ({
-              description: '',
-              manifestNo: e.manifestNo || '',
-              hsnCode: '999432',
-              quantity: e.quantity,
-              unit: e.unit,
-              rate: (e as any).rate || 0,
-              amount: ((e as any).rate && e.quantity) ? ((e as any).rate * e.quantity) : 0
-            }))
-            : [],
+        customerName:
+          fullInvoice.customerName || fullInvoice.company?.name || "",
+        customerAddress: fullInvoice.billedTo || "",
+        customerGst: fullInvoice.gstNo || fullInvoice.company?.gstNumber || "",
+        description: fullInvoice.description || "",
+        items:
+          materials.length > 0
+            ? materials.map((m) => ({
+                description: (m as any).description || "",
+                materialName: m.materialName,
+                manifestNo: (m as any).manifestNo || "",
+                hsnCode: (m as any).hsnCode || "999432",
+                quantity: m.quantity,
+                unit: m.unit,
+                rate: m.rate,
+                amount: m.amount,
+              }))
+            : fullInvoice.inwardEntries && fullInvoice.inwardEntries.length > 0
+              ? fullInvoice.inwardEntries.map((e) => ({
+                  description: "",
+                  manifestNo: e.manifestNo || "",
+                  hsnCode: "999432",
+                  quantity: e.quantity,
+                  unit: e.unit,
+                  rate: (e as any).rate || 0,
+                  amount:
+                    (e as any).rate && e.quantity
+                      ? (e as any).rate * e.quantity
+                      : 0,
+                }))
+              : [],
         subTotal: fullInvoice.subtotal,
         cgst: fullInvoice.cgst || 0,
         sgst: fullInvoice.sgst || 0,
         additionalCharges: fullInvoice.additionalCharges || 0,
-        additionalChargesDescription: fullInvoice.additionalChargesDescription || '',
+        additionalChargesDescription:
+          fullInvoice.additionalChargesDescription || "",
         additionalChargesQuantity: fullInvoice.additionalChargesQuantity || 0,
         additionalChargesRate: fullInvoice.additionalChargesRate || 0,
-        additionalChargesUnit: fullInvoice.additionalChargesUnit || '',
+        additionalChargesUnit: fullInvoice.additionalChargesUnit || "",
         additionalChargesList: additionalChargesList,
-        grandTotal: fullInvoice.grandTotal
+        grandTotal: fullInvoice.grandTotal,
       };
 
       const pdfBlob = await generateInvoicePDF(pdfData);
 
       // Upload to R2 in background
-      invoicesService.uploadInvoice(fullInvoice.id, pdfBlob, `Invoice_${fullInvoice.invoiceNo}.pdf`)
-        .catch(err => console.error('R2 Upload failed:', err));
+      invoicesService
+        .uploadInvoice(
+          fullInvoice.id,
+          pdfBlob,
+          `Invoice_${fullInvoice.invoiceNo}.pdf`,
+        )
+        .catch((err) => console.error("R2 Upload failed:", err));
 
       toast.success("Invoice downloaded successfully");
     } catch (error) {
@@ -225,7 +338,9 @@ export default function Invoices() {
       render: (invoice: Invoice) => (
         <div className="flex items-center gap-2">
           <FileText className="w-4 h-4 text-muted-foreground" />
-          <span className="font-medium text-foreground">{invoice.invoiceNo}</span>
+          <span className="font-medium text-foreground">
+            {invoice.invoiceNo}
+          </span>
         </div>
       ),
     },
@@ -234,23 +349,31 @@ export default function Invoices() {
       header: "Type",
       render: (invoice: Invoice) => (
         <span
-          className={`px-2 py-1 rounded text-xs ${invoice.type === "Inward"
-            ? "bg-primary/20 text-primary"
-            : invoice.type === "Outward"
-              ? "bg-warning/20 text-warning"
-              : "bg-chart-4/20 text-chart-4"
-            }`}
+          className={`px-2 py-1 rounded text-xs ${
+            invoice.type === "Inward"
+              ? "bg-primary/20 text-primary"
+              : invoice.type === "Outward"
+                ? "bg-warning/20 text-warning"
+                : "bg-chart-4/20 text-chart-4"
+          }`}
         >
           {invoice.type}
         </span>
       ),
     },
-    { key: "date", header: "Date", render: (invoice: Invoice) => format(new Date(invoice.date), 'dd MMM yyyy') },
+    {
+      key: "date",
+      header: "Date",
+      render: (invoice: Invoice) =>
+        format(new Date(invoice.date), "dd MMM yyyy"),
+    },
     {
       key: "customerName",
       header: "Customer/Vendor",
       render: (invoice: Invoice) => (
-        <span className="font-medium text-foreground">{invoice.customerName || '-'}</span>
+        <span className="font-medium text-foreground">
+          {invoice.customerName || "-"}
+        </span>
       ),
     },
     {
@@ -260,7 +383,10 @@ export default function Invoices() {
         <div className="space-y-1">
           {invoice.invoiceManifests && invoice.invoiceManifests.length > 0 ? (
             invoice.invoiceManifests.map((m, index) => (
-              <span key={`${m.id}-${index}`} className="block text-xs text-muted-foreground">
+              <span
+                key={`${m.id}-${index}`}
+                className="block text-xs text-muted-foreground"
+              >
                 {m.manifestNo}
               </span>
             ))
@@ -285,21 +411,29 @@ export default function Invoices() {
       render: (invoice: Invoice) => {
         const cgst = Number(invoice.cgst || 0);
         const sgst = Number(invoice.sgst || 0);
-        return <span className="text-muted-foreground">₹{formatCurrency(cgst + sgst)}</span>;
+        return (
+          <span className="text-muted-foreground">
+            ₹{formatCurrency(cgst + sgst)}
+          </span>
+        );
       },
     },
     {
       key: "grandTotal",
       header: "Grand Total",
       render: (invoice: Invoice) => (
-        <span className="font-medium text-foreground">₹{formatCurrency(invoice.grandTotal)}</span>
+        <span className="font-medium text-foreground">
+          ₹{formatCurrency(invoice.grandTotal)}
+        </span>
       ),
     },
     {
       key: "paymentReceived",
       header: "Received",
       render: (invoice: Invoice) => (
-        <span className="text-success">₹{formatCurrency(invoice.paymentReceived)}</span>
+        <span className="text-success">
+          ₹{formatCurrency(invoice.paymentReceived)}
+        </span>
       ),
     },
     {
@@ -331,7 +465,17 @@ export default function Invoices() {
           >
             <Eye className="w-4 h-4" />
           </button>
-          {user?.role !== 'admin' && (
+          {user?.role !== "admin" && invoice.status !== "cancelled" && (
+            <button
+              onClick={() => handleCancelClick(invoice)}
+              disabled={cancelMutation.isPending}
+              className="p-2 rounded-lg text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10 transition-colors disabled:opacity-50"
+              title="Cancel Invoice"
+            >
+              <Ban className="w-4 h-4" />
+            </button>
+          )}
+          {user?.role !== "admin" && (
             <button
               onClick={() => handleDelete(invoice.id)}
               disabled={deleteMutation.isPending}
@@ -347,7 +491,10 @@ export default function Invoices() {
   ];
 
   return (
-    <MainLayout title="Inward Invoices" subtitle="Track and manage vendor payment invoices">
+    <MainLayout
+      title="Inward Invoices"
+      subtitle="Track and manage vendor payment invoices"
+    >
       {/* Actions Bar */}
       <div className="flex flex-col sm:flex-row gap-4 mb-6">
         <div className="relative flex-1">
@@ -369,70 +516,90 @@ export default function Invoices() {
         <button
           onClick={async () => {
             try {
-              const toastId = toast.loading('Exporting invoices...');
-              const { invoices: allInvoices } = await invoicesService.getInvoices({
-                limit: 10000,
-                type: 'Inward',
-                search: debouncedSearchTerm || undefined,
-              });
+              const toastId = toast.loading("Exporting invoices...");
+              const { invoices: allInvoices } =
+                await invoicesService.getInvoices({
+                  limit: 10000,
+                  type: "Inward",
+                  search: debouncedSearchTerm || undefined,
+                });
 
               exportToCSV(
                 allInvoices,
                 [
-                  { key: 'invoiceNo', header: 'Invoice No.' },
-                  { key: 'type', header: 'Type' },
-                  { key: 'date', header: 'Date' },
-                  { key: 'customerName', header: 'Customer/Vendor' },
-                  { key: 'manifestNo', header: 'Manifest No.' },
-                  { key: 'subtotal', header: 'Subtotal' },
-                  { key: 'gst', header: 'GST' },
-                  { key: 'grandTotal', header: 'Grand Total' },
-                  { key: 'paymentReceived', header: 'Received' },
-                  { key: 'status', header: 'Status' },
+                  { key: "invoiceNo", header: "Invoice No." },
+                  { key: "type", header: "Type" },
+                  { key: "date", header: "Date" },
+                  { key: "customerName", header: "Customer/Vendor" },
+                  { key: "manifestNo", header: "Manifest No." },
+                  { key: "subtotal", header: "Subtotal" },
+                  { key: "gst", header: "GST" },
+                  { key: "grandTotal", header: "Grand Total" },
+                  { key: "paymentReceived", header: "Received" },
+                  { key: "status", header: "Status" },
                 ],
                 `invoices-${new Date().toISOString().slice(0, 10)}.csv`,
                 {
                   date: (value) => {
-                    if (!value) return '';
+                    if (!value) return "";
                     try {
-                      return format(new Date(value), 'dd/MM/yyyy');
+                      return format(new Date(value), "dd/MM/yyyy");
                     } catch (e) {
                       return String(value);
                     }
                   },
                   customerName: (value, item: Invoice) => {
-                    return value || item.company?.name || item.transporter?.name || '-';
+                    return (
+                      value ||
+                      item.company?.name ||
+                      item.transporter?.name ||
+                      "-"
+                    );
                   },
                   manifestNo: (_, item: Invoice) => {
                     const manifests = new Set<string>();
 
-                    item.invoiceManifests?.forEach(m => manifests.add(m.manifestNo));
-                    item.inwardEntries?.forEach(e => manifests.add(e.manifestNo));
-                    item.outwardEntries?.forEach(e => manifests.add(e.manifestNo));
-                    item.invoiceMaterials?.forEach(m => {
+                    item.invoiceManifests?.forEach((m) =>
+                      manifests.add(m.manifestNo),
+                    );
+                    item.inwardEntries?.forEach((e) =>
+                      manifests.add(e.manifestNo),
+                    );
+                    item.outwardEntries?.forEach((e) =>
+                      manifests.add(e.manifestNo),
+                    );
+                    item.invoiceMaterials?.forEach((m) => {
                       if (m.manifestNo) manifests.add(m.manifestNo);
                     });
 
-                    return Array.from(manifests).join(', ') || '-';
+                    return Array.from(manifests).join(", ") || "-";
                   },
                   subtotal: (value, item: Invoice) => {
                     const subtotal = Number(value || 0);
-                    const additionalCharges = Number(item.additionalCharges || 0);
-                    return formatCurrencyForExport(subtotal + additionalCharges);
+                    const additionalCharges = Number(
+                      item.additionalCharges || 0,
+                    );
+                    return formatCurrencyForExport(
+                      subtotal + additionalCharges,
+                    );
                   },
                   gst: (_, item: Invoice) => {
-                    const sum = (Number(item.cgst) || 0) + (Number(item.sgst) || 0);
+                    const sum =
+                      (Number(item.cgst) || 0) + (Number(item.sgst) || 0);
                     return formatCurrencyForExport(sum);
                   },
                   grandTotal: (value) => formatCurrencyForExport(value),
                   paymentReceived: (value) => formatCurrencyForExport(value),
-                  status: (value) => value ? (value.charAt(0).toUpperCase() + value.slice(1)) : '-',
-                }
+                  status: (value) =>
+                    value
+                      ? value.charAt(0).toUpperCase() + value.slice(1)
+                      : "-",
+                },
               );
               toast.dismiss(toastId);
-              toast.success('Invoices exported successfully');
+              toast.success("Invoices exported successfully");
             } catch (error) {
-              toast.error('Failed to export invoices');
+              toast.error("Failed to export invoices");
               console.error(error);
             }
           }}
@@ -442,11 +609,13 @@ export default function Invoices() {
           <span className="hidden md:inline">Export CSV</span>
         </button>
         <div className="flex gap-2">
-          {user?.role !== 'admin' && (
-            <Button onClick={() => {
-              setInvoiceType('Inward');
-              setIsCreateInvoiceOpen(true);
-            }}>
+          {user?.role !== "admin" && (
+            <Button
+              onClick={() => {
+                setInvoiceType("Inward");
+                setIsCreateInvoiceOpen(true);
+              }}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Create Invoice
             </Button>
@@ -458,7 +627,9 @@ export default function Invoices() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="glass-card p-4">
           <p className="text-sm text-muted-foreground">Total Inward Invoices</p>
-          <p className="text-2xl font-bold text-foreground mt-1">{stats.totalInvoices}</p>
+          <p className="text-2xl font-bold text-foreground mt-1">
+            {stats.totalInvoices}
+          </p>
         </div>
         <div className="glass-card p-4">
           <p className="text-sm text-muted-foreground">Total Inward Amount</p>
@@ -483,8 +654,16 @@ export default function Invoices() {
       {/* Data Table */}
       {error ? (
         <div className="text-center py-12 glass-card">
-          <p className="text-destructive">Failed to load invoices. Please try again later.</p>
-          <Button variant="outline" onClick={() => queryClient.invalidateQueries({ queryKey: ["invoices"] })} className="mt-4">
+          <p className="text-destructive">
+            Failed to load invoices. Please try again later.
+          </p>
+          <Button
+            variant="outline"
+            onClick={() =>
+              queryClient.invalidateQueries({ queryKey: ["invoices"] })
+            }
+            className="mt-4"
+          >
             Retry
           </Button>
         </div>
@@ -522,15 +701,107 @@ export default function Invoices() {
               setPaymentForm({
                 paymentReceived: Number(selectedInvoice.paymentReceived),
                 paymentReceivedOn: selectedInvoice.paymentReceivedOn
-                  ? format(new Date(selectedInvoice.paymentReceivedOn), 'yyyy-MM-dd')
-                  : '',
+                  ? format(
+                      new Date(selectedInvoice.paymentReceivedOn),
+                      "yyyy-MM-dd",
+                    )
+                  : "",
               });
               setPaymentEditOpen(true);
             }}
             onCancelPaymentEdit={() => setPaymentEditOpen(false)}
             onUpdatePayment={handleUpdatePayment}
+            onCancelInvoice={handleCancelClick}
             isLoading={updatePaymentMutation.isPending}
           />
+        )}
+      </Modal>
+
+      {/* Cancel Invoice Modal */}
+      <Modal
+        isOpen={cancelConfirm.isOpen}
+        onClose={() => {
+          setCancelConfirm({ isOpen: false, invoice: null });
+          setCancellationReason("");
+        }}
+        title={`Cancel Invoice - ${cancelConfirm.invoice?.invoiceNo}`}
+        size="md"
+      >
+        {cancelConfirm.invoice && (
+          <div className="space-y-4">
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 text-sm">
+              <p className="font-semibold mb-1 flex items-center gap-1.5">
+                <Ban className="w-4 h-4" /> Financial Workflow Cancellation
+              </p>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                This invoice will be permanently marked as{" "}
+                <strong>Cancelled</strong> and excluded from active revenue,
+                receivables, and financial totals. The invoice number (
+                {cancelConfirm.invoice.invoiceNo}) will remain permanently
+                consumed.
+              </p>
+            </div>
+
+            <div className="text-sm space-y-1.5 bg-secondary/40 p-3 rounded-lg">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Customer/Vendor:</span>
+                <span className="font-medium text-foreground">
+                  {cancelConfirm.invoice.customerName || "-"}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Grand Total:</span>
+                <span className="font-semibold text-foreground">
+                  ₹{formatCurrency(cancelConfirm.invoice.grandTotal)}
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Cancellation Reason <span className="text-destructive">*</span>
+              </label>
+              <textarea
+                className="input-field w-full min-h-[90px] py-2"
+                placeholder="Reason for cancelling this invoice (e.g. Duplicate invoice created by mistake, incorrect rate)..."
+                value={cancellationReason}
+                onChange={(e) => setCancellationReason(e.target.value)}
+              />
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Minimum 3 characters required.
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCancelConfirm({ isOpen: false, invoice: null });
+                  setCancellationReason("");
+                }}
+                disabled={cancelMutation.isPending}
+              >
+                Close
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={confirmCancel}
+                disabled={
+                  cancelMutation.isPending ||
+                  cancellationReason.trim().length < 3
+                }
+              >
+                {cancelMutation.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Cancelling...
+                  </>
+                ) : (
+                  "Confirm Cancellation"
+                )}
+              </Button>
+            </div>
+          </div>
         )}
       </Modal>
 
@@ -540,10 +811,10 @@ export default function Invoices() {
         onClose={() => setIsCreateInvoiceOpen(false)}
         type={invoiceType}
         onSuccess={() => {
-          queryClient.invalidateQueries({ queryKey: ['invoices'] });
-          queryClient.invalidateQueries({ queryKey: ['invoice-stats'] });
-          queryClient.invalidateQueries({ queryKey: ['inward'] });
-          queryClient.invalidateQueries({ queryKey: ['outward'] });
+          queryClient.invalidateQueries({ queryKey: ["invoices"] });
+          queryClient.invalidateQueries({ queryKey: ["invoice-stats"] });
+          queryClient.invalidateQueries({ queryKey: ["inward"] });
+          queryClient.invalidateQueries({ queryKey: ["outward"] });
         }}
       />
 
@@ -572,11 +843,35 @@ function InvoiceDetails({
   onEditPayment,
   onCancelPaymentEdit,
   onUpdatePayment,
+  onCancelInvoice,
   isLoading,
 }: any) {
   const { user } = useAuth();
+  const isCancelled = invoice.status === "cancelled";
+
   return (
     <div className="space-y-6">
+      {/* Cancelled Banner */}
+      {isCancelled && (
+        <div className="p-3.5 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive text-sm space-y-1">
+          <p className="font-semibold flex items-center gap-1.5">
+            <Ban className="w-4 h-4" /> This Invoice is Cancelled
+          </p>
+          {invoice.cancellationReason && (
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Reason:</span>{" "}
+              {invoice.cancellationReason}
+            </p>
+          )}
+          {invoice.cancelledAt && (
+            <p className="text-xs text-muted-foreground">
+              <span className="font-medium text-foreground">Cancelled on:</span>{" "}
+              {format(new Date(invoice.cancelledAt), "dd MMM yyyy, hh:mm a")}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Basic Info */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div>
@@ -589,7 +884,9 @@ function InvoiceDetails({
         </div>
         <div>
           <p className="text-sm text-muted-foreground">Date</p>
-          <p className="font-medium text-foreground">{format(new Date(invoice.date), 'dd MMM yyyy')}</p>
+          <p className="font-medium text-foreground">
+            {format(new Date(invoice.date), "dd MMM yyyy")}
+          </p>
         </div>
         <div>
           <p className="text-sm text-muted-foreground">Status</p>
@@ -607,23 +904,33 @@ function InvoiceDetails({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <p className="text-sm text-muted-foreground">Customer/Vendor</p>
-          <p className="font-medium text-foreground">{invoice.customerName || '-'}</p>
+          <p className="font-medium text-foreground">
+            {invoice.customerName || "-"}
+          </p>
         </div>
         {invoice.company && (
           <div>
             <p className="text-sm text-muted-foreground">Company</p>
-            <p className="font-medium text-foreground">{invoice.company.name}</p>
+            <p className="font-medium text-foreground">
+              {invoice.company.name}
+            </p>
             {invoice.company.gstNumber && (
-              <p className="text-xs text-muted-foreground">GST: {invoice.company.gstNumber}</p>
+              <p className="text-xs text-muted-foreground">
+                GST: {invoice.company.gstNumber}
+              </p>
             )}
           </div>
         )}
         {invoice.transporter && (
           <div>
             <p className="text-sm text-muted-foreground">Transporter</p>
-            <p className="font-medium text-foreground">{invoice.transporter.name}</p>
+            <p className="font-medium text-foreground">
+              {invoice.transporter.name}
+            </p>
             {invoice.transporter.gstNumber && (
-              <p className="text-xs text-muted-foreground">GST: {invoice.transporter.gstNumber}</p>
+              <p className="text-xs text-muted-foreground">
+                GST: {invoice.transporter.gstNumber}
+              </p>
             )}
           </div>
         )}
@@ -635,7 +942,10 @@ function InvoiceDetails({
           <p className="text-sm text-muted-foreground mb-2">Manifest Numbers</p>
           <div className="flex flex-wrap gap-2">
             {invoice.invoiceManifests.map((m: any, index: number) => (
-              <span key={`${m.id}-${index}`} className="px-2 py-1 bg-secondary text-secondary-foreground rounded text-sm">
+              <span
+                key={`${m.id}-${index}`}
+                className="px-2 py-1 bg-secondary text-secondary-foreground rounded text-sm"
+              >
                 {m.manifestNo}
               </span>
             ))}
@@ -649,7 +959,10 @@ function InvoiceDetails({
           <p className="text-sm text-muted-foreground mb-2">Materials</p>
           <div className="space-y-2">
             {invoice.invoiceMaterials.map((m: any, index: number) => (
-              <div key={`${m.id}-${index}`} className="flex justify-between items-center p-2 bg-secondary rounded">
+              <div
+                key={`${m.id}-${index}`}
+                className="flex justify-between items-center p-2 bg-secondary rounded"
+              >
                 <div>
                   <p className="font-medium">{m.materialName}</p>
                   <p className="text-xs text-muted-foreground">
@@ -676,7 +989,12 @@ function InvoiceDetails({
         </div>
         <div className="flex justify-between pt-1 border-t border-border/50">
           <p className="text-sm font-medium">Subtotal</p>
-          <p className="font-semibold">₹{formatCurrency(Number(invoice.subtotal) + Number(invoice.additionalCharges || 0))}</p>
+          <p className="font-semibold">
+            ₹
+            {formatCurrency(
+              Number(invoice.subtotal) + Number(invoice.additionalCharges || 0),
+            )}
+          </p>
         </div>
         {(Number(invoice.cgst) > 0 || Number(invoice.sgst) > 0) && (
           <>
@@ -692,7 +1010,9 @@ function InvoiceDetails({
         )}
         <div className="flex justify-between pt-2 border-t border-border">
           <p className="font-medium text-lg">Grand Total</p>
-          <p className="font-bold text-lg">₹{formatCurrency(invoice.grandTotal)}</p>
+          <p className="font-bold text-lg">
+            ₹{formatCurrency(invoice.grandTotal)}
+          </p>
         </div>
       </div>
 
@@ -707,15 +1027,25 @@ function InvoiceDetails({
             </p>
             {invoice.paymentReceivedOn && (
               <p className="text-xs text-muted-foreground">
-                On {format(new Date(invoice.paymentReceivedOn), 'dd MMM yyyy')}
+                On {format(new Date(invoice.paymentReceivedOn), "dd MMM yyyy")}
               </p>
             )}
           </div>
-          {!paymentEditOpen && user?.role !== 'admin' && (
-            <Button variant="outline" onClick={onEditPayment}>
-              <Edit className="w-4 h-4 mr-2" />
-              Edit Payment
-            </Button>
+          {!paymentEditOpen && user?.role !== "admin" && !isCancelled && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="text-destructive hover:bg-destructive/10 hover:text-destructive border-destructive/30"
+                onClick={() => onCancelInvoice(invoice)}
+              >
+                <Ban className="w-4 h-4 mr-1.5" />
+                Cancel Invoice
+              </Button>
+              <Button variant="outline" onClick={onEditPayment}>
+                <Edit className="w-4 h-4 mr-2" />
+                Edit Payment
+              </Button>
+            </div>
           )}
         </div>
 
@@ -732,7 +1062,10 @@ function InvoiceDetails({
                   className="input-field w-full"
                   value={paymentForm.paymentReceived}
                   onChange={(e) =>
-                    setPaymentForm({ ...paymentForm, paymentReceived: parseFloat(e.target.value) || 0 })
+                    setPaymentForm({
+                      ...paymentForm,
+                      paymentReceived: parseFloat(e.target.value) || 0,
+                    })
                   }
                 />
               </div>
@@ -745,13 +1078,20 @@ function InvoiceDetails({
                   className="input-field w-full"
                   value={paymentForm.paymentReceivedOn}
                   onChange={(e) =>
-                    setPaymentForm({ ...paymentForm, paymentReceivedOn: e.target.value })
+                    setPaymentForm({
+                      ...paymentForm,
+                      paymentReceivedOn: e.target.value,
+                    })
                   }
                 />
               </div>
             </div>
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={onCancelPaymentEdit} disabled={isLoading}>
+              <Button
+                variant="outline"
+                onClick={onCancelPaymentEdit}
+                disabled={isLoading}
+              >
                 Cancel
               </Button>
               <Button onClick={onUpdatePayment} disabled={isLoading}>
@@ -761,7 +1101,7 @@ function InvoiceDetails({
                     Updating...
                   </>
                 ) : (
-                  'Update Payment'
+                  "Update Payment"
                 )}
               </Button>
             </div>

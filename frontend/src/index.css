@@ -141,6 +141,10 @@
     @apply bg-warning/20 text-[hsl(var(--warning))];
   }
 
+  .status-cancelled {
+    @apply bg-destructive/20 text-[hsl(var(--destructive))];
+  }
+
   .kpi-card {
     @apply glass-card p-6 relative overflow-hidden;
   }
